@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=2160, initial-scale=1.0">
+<title>Ask Kimberly - Chat with me</title>
+<script>
+window.__CONFIG = {
+  D_ID_API_KEY: 'aW12bXMyMDVAZ21haWwuY29t:mxgYbhVrC7OAYz1nzj561',
+  D_ID_AGENT_ID: 'v2_agt_LJ2exBPU'
+};
+</script>
+<script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script type="module">
+  import * as did from 'https://esm.sh/@d-id/client-sdk@1.1.57';
+  window.__DID = did;
+  window.__DID_READY = true;
+  window.dispatchEvent(new Event('did-ready'));
+</script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #000;
+  overflow: hidden;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#root {
+  width: 2160px;
+  height: 3840px;
+  transform-origin: top left;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+@keyframes pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
+@keyframes ripple {
+  0% { transform: scale(0.85); opacity: 0.6; }
+  100% { transform: scale(1.5); opacity: 0; }
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes micPulse {
+  0% { box-shadow: 0 0 0 0 rgba(207,70,58,0.5); }
+  70% { box-shadow: 0 0 0 40px rgba(207,70,58,0); }
+  100% { box-shadow: 0 0 0 0 rgba(207,70,58,0); }
+}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+function scaleKiosk() {
+  var root = document.getElementById('root');
+  var scaleX = window.innerWidth / 2160;
+  var scaleY = window.innerHeight / 3840;
+  var scale = Math.min(scaleX, scaleY);
+  root.style.transform = 'scale(' + scale + ')';
+  root.style.left = ((window.innerWidth - 2160 * scale) / 2) + 'px';
+  root.style.top = ((window.innerHeight - 3840 * scale) / 2) + 'px';
+}
+scaleKiosk();
+window.addEventListener('resize', scaleKiosk);
+</script>
+<script type="text/babel">
+const { useState, useRef, useEffect, useCallback } = React;
+
+const RED = "#CF463A";
+const GOLD = "#F5B150";
+const DARK_TEXT = "#324157";
+const WHITE = "#FFFFFF";
+
+// ─── Restaurant Data ───
+
+const MALL_NAME = "Kopitiam Food Court at Tan Tock Seng Hospital";
+const BRANDS = [
+  { stall: 1, brand: "Kopi Kiosk", cuisine: "Drinks & Desserts", halal: false, signature: "Kopitiam Signature Breakfast Set", desc: "Traditional kopi/teh, Yakult Juices, Ice Spin series, Super Saver Bao set. Breakfast set $3 (union member before 11am)." },
+  { stall: 1, brand: "Ann Chin Popiah", cuisine: "Popiah (Michelin Guide)", halal: false, signature: "Popiah", desc: "Founded 1958. Famous for thin, fragrant, chewy popiah skin. Heritage recipe." },
+  { stall: 2, brand: "Bread Junction", cuisine: "Bread & Bakery", halal: true, signature: "Fresh Bread", desc: "Muslim-friendly bakery with fresh bread and pastries." },
+  { stall: 3, brand: "Kallang Airport Wanton Mee", cuisine: "Wanton Noodle", halal: false, signature: "Wanton Noodle", desc: "Recipe from hawker selling since 1960. Delicious Char Siew, piquant chilli sauce, crispy pork lard, hand-wrapped wantons." },
+  { stall: 4, brand: "Teochew Pig Organ Soup & Braised", cuisine: "Teochew Cuisine", halal: false, signature: "Salted Vegetable Pig's Organ Soup", desc: "Authentic Teochew flavours. Must-tries: Pig's Organ Soup, Teochew noodles, Chaoshan braised meat." },
+  { stall: 5, brand: "Yuan Wei Su Yu", cuisine: "Vegetarian", halal: false, signature: "Vegetarian Set Meal", desc: "Healthy plant-based eating. Low Oil, Low Salt, No MSG, fresh ingredients." },
+  { stall: 6, brand: "Ying Jia Steamed Fish", cuisine: "Steamed Fish", halal: false, signature: "HK Steamed Seabass", desc: "Recipe from hotel chef (20 years). Known for signature garlic sauce. Also: Cai Pu Steamed Seabass, Bean Sauce Seabass." },
+  { stall: 7, brand: "Xiang Chi Mian", cuisine: "Bak Chor Mee", halal: false, signature: "Bak Chor Mee", desc: "Authentic Singapore hawker Bak Chor Mee. Sambal chilli, black vinegar, crispy pork lard. Pork slices, liver, meatball, minced meat, braised shiitake." },
+  { stall: 8, brand: "He Jia Econ Rice & Porridge", cuisine: "Economical Rice", halal: false, signature: "Sweet and Sour Chicken", desc: "Established 2011. Over 10 dishes daily. Also: Spicy Sambal Prawns, Braised Tofu." },
+  { stall: 9, brand: "Yuan Wei Thai Cuisine", cuisine: "Thai", halal: false, signature: "Tom Yum Soup", desc: "Prepared by experienced Thai chefs. Also: stir-fried rice noodles, basil minced pork." },
+  { stall: 10, brand: "Bu Tang Wang Pepper Soup", cuisine: "Pepper Soup", halal: false, signature: "White Pepper Chicken Soup", desc: "Hearty pepper soups. Also: ABC Soup, Lotus Root Soup, Fish Maw Chicken, Black Chicken Soup." },
+  { stall: 11, brand: "King Grouper Fish Soup", cuisine: "Fish Soup", halal: false, signature: "Teochew Style Grouper", desc: "Own fish farm in Changi. Giant Grouper 12kg+, high collagen. SFA Farm-To-Table recognition. Also: Red Grouper Fish Soup, Seafood Soup." },
+  { stall: 12, brand: "Chinatown HK Roast", cuisine: "HK Roast Meat", halal: false, signature: "Famous 3 Roast Set Meal", desc: "Char Siew, Roast Duck, Roast Pork. Also: Duck rice, Wanton Noodles, Braised Chicken Feet." },
+  { stall: 13, brand: "Kakak Handmade Noodles", cuisine: "Ban Mian", halal: true, signature: "Handmade Ban Mian", desc: "Muslim-friendly handmade noodles." },
+  { stall: 14, brand: "Cinta Hainanese Chicken Rice", cuisine: "Chicken Rice", halal: true, signature: "Hainanese Chicken Rice", desc: "Muslim-friendly Hainanese chicken rice." },
+  { stall: 15, brand: "Monster Chili Mala Hot Pot", cuisine: "Mala Hotpot", halal: true, signature: "Mala Hot Pot", desc: "Singapore's first halal Mala hotpot (est. 2014). Own secret Mala Paste. Customizable spice levels. Also: Mala Soup, Malatang, Mala Noodle." },
+  { stall: 16, brand: "Beradik Western", cuisine: "Western Food", halal: true, signature: "Fish & Chips", desc: "Muslim-friendly Western food. Also: Grilled Beef Steak, Mixed Grill, Aglio Olio, Lamb Chop, Spring Chicken." },
+  { stall: 17, brand: "Pak Lum Local Delights", cuisine: "Local Hawker", halal: true, signature: "Char Kway Teow", desc: "Smoky CKT, crispy Oyster Omelette, charred Carrot Cake. Wok hei perfection. Also: Hokkien Mee, Mee Goreng." },
+  { stall: 18, brand: "Kim Dae Bak Korean & Japanese", cuisine: "Korean & Japanese", halal: true, signature: "Saba Fish", desc: "Head chef from Ju Shin Jung (10 years). Also: Korean Army Stew, Beef Bulgogi, Kimchi Jjigae, Bibimbap." },
+  { stall: 19, brand: "Majulah Nasi Padang", cuisine: "Nasi Padang", halal: true, signature: "Nasi Lemak Beef Rendang", desc: "Muslim-friendly Nasi Padang. Also: Ayam Goreng, Ayam Masak Merah, Nasi Kuning." },
+  { stall: 20, brand: "Y&H Ayam Penyet", cuisine: "Indonesian", halal: true, signature: "Ayam Penyet", desc: "Indonesian smashed fried chicken. Also: Ikan Penyet, Ayam Bakar, Lontong, Mee Soto, Grilled Seafood Set." },
+  { stall: 21, brand: "Ampang YTF & Tangkak Beef Noodle", cuisine: "Yong Tau Foo & Beef Noodle", halal: true, signature: "Ampang Yong Tau Foo", desc: "15-year family recipe. Secret soup base and ampang sauce. Each piece carefully crafted." },
+];
+
+// ─── Topic filter ───
+
+function filterMessage(text) {
+  return { allowed: true };
+}
+
+// ─── Speech Recognition Hook (tap-to-talk) ───
+
+function useSpeechRecognition() {
+  const [isListening, setIsListening] = useState(false);
+  const [transcript, setTranscript] = useState("");
+  const [supported, setSupported] = useState(true);
+  const recognitionRef = useRef(null);
+  const transcriptRef = useRef("");
+  const onEndCallbackRef = useRef(null);
+
+  useEffect(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) { setSupported(false); return; }
+    const recognition = new SpeechRecognition();
+    recognition.lang = "en-US";
+    recognition.continuous = false;
+    recognition.interimResults = true;
+
+    recognition.onresult = (event) => {
+      let text = "";
+      for (let i = 0; i < event.results.length; i++) {
+        text += event.results[i][0].transcript;
+      }
+      transcriptRef.current = text;
+      setTranscript(text);
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+      const cb = onEndCallbackRef.current;
+      const text = transcriptRef.current;
+      onEndCallbackRef.current = null;
+      if (cb && text.trim()) {
+        cb(text.trim());
+      }
+    };
+    recognition.onerror = (e) => {
+      console.error("Speech error:", e.error);
+      setIsListening(false);
+      onEndCallbackRef.current = null;
+    };
+
+    recognitionRef.current = recognition;
+  }, []);
+
+  const startListening = useCallback(() => {
+    if (recognitionRef.current && !isListening) {
+      transcriptRef.current = "";
+      setTranscript("");
+      recognitionRef.current.start();
+      setIsListening(true);
+    }
+  }, [isListening]);
+
+  const stopListening = useCallback((onEnd) => {
+    if (recognitionRef.current && isListening) {
+      onEndCallbackRef.current = onEnd;
+      recognitionRef.current.stop();
+    }
+  }, [isListening]);
+
+  return { isListening, transcript, supported, startListening, stopListening };
+}
+
+// ─── Nav Button Component ───
+
+function NavButton({ icon, label, active }) {
+  return (
+    <div style={{
+      width: 267, height: 257,
+      background: active ? RED : "rgba(254, 254, 254, 0.8)",
+      border: active ? `5px solid ${GOLD}` : "5px solid #B0B0B0",
+      boxShadow: active ? `0px 4px 40px ${GOLD}` : "0px 4px 40px rgba(0, 0, 0, 0.25)",
+      borderRadius: 50,
+      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+      gap: 12, cursor: "pointer",
+    }}>
+      <div style={{ color: active ? WHITE : DARK_TEXT }} dangerouslySetInnerHTML={{ __html: icon }} />
+      <span style={{
+        fontWeight: 600, fontSize: 40, lineHeight: "48px",
+        color: active ? WHITE : DARK_TEXT, textAlign: "center",
+      }}>{label}</span>
+    </div>
+  );
+}
+
+// ─── SVG Icons ───
+
+const ICONS = {
+  home: `<svg width="96" height="96" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>`,
+  seats: `<svg width="96" height="96" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>`,
+  stores: `<svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>`,
+  food: `<svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z"/></svg>`,
+  chat: `<svg width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/></svg>`,
+  mic: `<svg width="127" height="123" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>`,
+};
+
+// ─── App ───
+
+function App() {
+  const [started, setStarted] = useState(false);
+  const [response, setResponse] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
+  const [didConnected, setDidConnected] = useState(false);
+  const [videoReady, setVideoReady] = useState(false);
+  const [didStatus, setDidStatus] = useState("Initializing...");
+  const [userText, setUserText] = useState("");
+  const [filtered, setFiltered] = useState(false);
+  const videoRef = useRef(null);
+  const agentRef = useRef(null);
+  const { isListening, transcript, supported, startListening, stopListening } = useSpeechRecognition();
+
+  const D_ID_API_KEY = window.__CONFIG?.D_ID_API_KEY;
+  const D_ID_AGENT_ID = window.__CONFIG?.D_ID_AGENT_ID;
+
+  // Connect D-ID only after user clicks Start
+  useEffect(() => {
+    if (!started) return;
+    let cancelled = false;
+    async function waitForSDK() {
+      if (window.__DID_READY) return;
+      return new Promise(resolve => window.addEventListener('did-ready', resolve, { once: true }));
+    }
+    async function connectDID() {
+      await waitForSDK();
+      const did = window.__DID;
+      if (!did) { setDidStatus("SDK failed to load"); return; }
+      try {
+        const agent = await did.createAgentManager(D_ID_AGENT_ID, {
+          auth: { type: 'basic', token: D_ID_API_KEY },
+          callbacks: {
+            onSrcObjectReady(srcObject) {
+              if (videoRef.current) {
+                videoRef.current.srcObject = srcObject;
+                videoRef.current.onloadeddata = () => videoRef.current.play().catch(() => {});
+                videoRef.current.play().catch(() => {});
+              }
+            },
+            onConnectionStateChange(state) {
+              if (cancelled) return;
+              setDidStatus(state);
+              if (state === 'connected') {
+                setDidConnected(true);
+                if (videoRef.current && videoRef.current.srcObject) {
+                  videoRef.current.play().catch(() => {});
+                }
+                setTimeout(() => {
+                  if (agentRef.current) {
+                    agentRef.current.chat("Hello").catch(() => {});
+                  }
+                }, 500);
+                setTimeout(() => { setVideoReady(true); }, 4000);
+              }
+            },
+            onVideoStateChange(state) {
+              if (state === 'START' || state === 'speaking') {
+                setSpeaking(true); setVideoReady(true);
+              }
+              if (state === 'STOP' || state === 'idle' || state === 'stopped') {
+                setSpeaking(false);
+              }
+            },
+            onNewMessage(msgs, type) {
+              if (cancelled) return;
+              if (msgs.length > 0) {
+                const last = msgs[msgs.length - 1];
+                if (last.role === 'assistant' && last.content) {
+                  setResponse(last.content);
+                  setLoading(false);
+                }
+              }
+            }
+          },
+          streamOptions: { compatibilityMode: 'auto', streamWarmup: true }
+        });
+        agentRef.current = agent;
+        await agent.connect();
+      } catch (err) {
+        console.error("D-ID connect error:", err);
+        setDidStatus("Error: " + err.message);
+      }
+    }
+    connectDID();
+    return () => {
+      cancelled = true;
+      if (agentRef.current) agentRef.current.disconnect().catch(() => {});
+    };
+  }, [started]);
+
+  const micDisabled = speaking || loading;
+
+  function sendToAgent(text) {
+    if (!text.trim() || !agentRef.current) return;
+    const check = filterMessage(text);
+    setUserText(text);
+    setFiltered(false);
+    if (!check.allowed) {
+      setResponse(check.reason);
+      setFiltered(true);
+      return;
+    }
+    setResponse("");
+    setLoading(true);
+    agentRef.current.chat(text).catch(err => {
+      console.error("chat error:", err);
+      setResponse("Error: " + (err.message || err));
+      setLoading(false);
+    });
+  }
+
+  function handleMicClick() {
+    if (micDisabled) return;
+    if (isListening) {
+      stopListening((text) => sendToAgent(text));
+    } else {
+      setUserText("");
+      setResponse("");
+      setFiltered(false);
+      startListening();
+    }
+  }
+
+  useEffect(() => {
+    if (!isListening && transcript.trim() && !userText && !loading) {
+      sendToAgent(transcript.trim());
+    }
+  }, [isListening]);
+
+  // ─── Start Screen ───
+  if (!started) {
+    return (
+      <div style={{
+        width: 2160, height: 3840, position: "relative", background: WHITE,
+        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+        backgroundImage: "linear-gradient(0deg, rgba(232,232,232,0.82), rgba(232,232,232,0.82)), url(assets/background.png)",
+        backgroundSize: "cover", backgroundPosition: "center",
+      }}>
+        {/* Logo */}
+        <img src="assets/kopitiam-logo.png" alt="Kopitiam" style={{ width: 800, marginBottom: 40 }} onError={(e) => { e.target.style.display = 'none'; }} />
+        <div style={{ fontSize: 64, fontWeight: 600, color: "#000", marginBottom: 40 }}>AI CONCIERGE</div>
+        <button onClick={() => setStarted(true)} style={{
+          padding: "40px 100px", background: RED, color: WHITE,
+          border: "none", borderRadius: 30, fontSize: 48, fontWeight: 700,
+          cursor: "pointer", boxShadow: "0 4px 40px rgba(207,70,58,0.4)"
+        }}>
+          Start Conversation
+        </button>
+        <div style={{ color: "#888", fontSize: 32, marginTop: 30 }}>Tap to begin</div>
+      </div>
+    );
+  }
+
+  // ─── Main Kiosk Screen ───
+  return (
+    <div style={{
+      width: 2160, height: 3840, position: "relative", background: WHITE, overflow: "hidden",
+      backgroundImage: "linear-gradient(0deg, rgba(232,232,232,0.82), rgba(232,232,232,0.82)), url(assets/background.png)",
+      backgroundSize: "cover", backgroundPosition: "center",
+    }}>
+
+      {/* ── Header: Logo + AI CONCIERGE ── */}
+      <div style={{ position: "absolute", top: 0, left: 0, width: 2160, textAlign: "center" }}>
+        <div style={{
+          fontWeight: 500, fontSize: 40, lineHeight: "48px", letterSpacing: "0.2em",
+          color: "#000", marginTop: 91,
+        }}>WELCOME TO</div>
+        <img src="assets/kopitiam-logo.png" alt="Kopitiam" style={{
+          width: 1222, height: "auto", margin: "0 auto", display: "block",
+        }} onError={(e) => {
+          e.target.outerHTML = '<div style="font-size:120px;font-weight:800;color:#CF463A;font-style:italic;margin:20px 0;">KOPITIAM</div>';
+        }} />
+        <div style={{
+          fontWeight: 500, fontSize: 40, lineHeight: "48px", letterSpacing: "0.2em",
+          color: "#000", marginTop: 10,
+        }}>AI CONCIERGE</div>
+      </div>
+
+      {/* ── Left Sidebar Nav ── */}
+      <div style={{
+        position: "absolute", left: 59, top: 340,
+        display: "flex", flexDirection: "column", gap: 29,
+      }}>
+        <NavButton icon={ICONS.home} label="Home" />
+        <NavButton icon={ICONS.seats} label="Seats" />
+        <NavButton icon={ICONS.stores} label="Stores" />
+        <NavButton icon={ICONS.food} label="Food" />
+        <NavButton icon={ICONS.chat} label={<span style={{ fontSize: 36, lineHeight: "40px" }}>Chat with<br/>me</span>} active />
+      </div>
+
+      {/* ── Kimberly Avatar (D-ID video, right side) ── */}
+      <div style={{
+        position: "absolute", width: 700, height: 700,
+        left: 1380, top: 936, overflow: "hidden",
+        borderRadius: "50%",
+        border: `6px solid ${GOLD}`,
+        boxShadow: speaking ? `0 0 60px rgba(245,177,80,0.4)` : "0 8px 40px rgba(0,0,0,0.15)",
+        transition: "all 0.3s",
+      }}>
+        <video ref={videoRef} autoPlay playsInline
+          onLoadedMetadata={() => { if (videoRef.current) videoRef.current.play().catch(() => {}); }}
+          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+        />
+        {!videoReady && (
+          <div style={{
+            position: "absolute", inset: 0, display: "flex", flexDirection: "column",
+            alignItems: "center", justifyContent: "center", background: "rgba(232,232,232,0.5)",
+          }}>
+            <div style={{ width: 60, height: 60, border: "4px solid #ddd", borderTopColor: RED, borderRadius: "50%", animation: "spin 1s linear infinite" }} />
+            <span style={{ color: "#888", fontSize: 32, marginTop: 20 }}>{didConnected ? "Loading avatar..." : didStatus}</span>
+          </div>
+        )}
+      </div>
+
+      {/* ── Chat Bubble Area ── */}
+      <div style={{
+        position: "absolute", left: 454, top: 744, width: 842,
+      }}>
+        {/* Name */}
+        <div style={{
+          fontWeight: 600, fontSize: 40, lineHeight: "48px",
+          color: RED, textAlign: "right", marginBottom: 16,
+        }}>Kimberly</div>
+
+        {/* Chat bubble */}
+        <div style={{
+          background: "rgba(245, 177, 80, 0.6)",
+          borderRadius: 20, padding: "32px 46px",
+          minHeight: 218,
+        }}>
+          {isListening && (
+            <div style={{ fontSize: 32, lineHeight: "39px", color: "#000" }}>
+              {transcript || "Listening..."}
+            </div>
+          )}
+          {loading && (
+            <div style={{ fontSize: 32, lineHeight: "39px", color: "#666" }}>Thinking...</div>
+          )}
+          {response && !loading && !isListening && (
+            <div style={{
+              fontSize: 32, lineHeight: "39px",
+              color: filtered ? "#CF463A" : "#000",
+            }}>
+              {response}
+            </div>
+          )}
+          {!response && !loading && !isListening && (
+            <div style={{ fontSize: 32, lineHeight: "39px", color: "#000" }}>
+              Hello! I'm Kimberly, your AI concierge here at Kopitiam, Tan Tock Seng Hospital. We have 21 food stalls with local favourites, halal options, and more. What are you in the mood for?
+            </div>
+          )}
+        </div>
+
+        {/* User text */}
+        {userText && !isListening && (
+          <div style={{ fontSize: 28, color: "#888", marginTop: 16 }}>
+            You said: "{userText}"
+          </div>
+        )}
+      </div>
+
+      {/* ── White content area (mid section) ── */}
+      <div style={{
+        position: "absolute", left: 0, top: 681, width: 2160, height: 1211,
+        background: "rgba(255, 255, 255, 0.4)", pointerEvents: "none",
+      }} />
+
+      {/* ── Speak Button ── */}
+      <div style={{
+        position: "absolute", left: "50%", top: 1753,
+        transform: "translateX(-50%)",
+        display: "flex", flexDirection: "column", alignItems: "center",
+      }}>
+        <button onClick={handleMicClick} style={{
+          width: 281, height: 277, borderRadius: "50%",
+          background: micDisabled ? "#999" : RED,
+          border: `10px solid ${micDisabled ? "#bbb" : GOLD}`,
+          boxShadow: isListening
+            ? "0 0 0 0 rgba(207,70,58,0.5)"
+            : "0px 4px 4px rgba(0, 0, 0, 0.25)",
+          color: WHITE,
+          cursor: micDisabled ? "not-allowed" : "pointer",
+          opacity: micDisabled ? 0.4 : 1,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          transition: "all 0.3s",
+          animation: isListening ? "micPulse 1.5s infinite" : "none",
+        }}>
+          <svg width="127" height="123" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+            <line x1="12" y1="19" x2="12" y2="23"/>
+            <line x1="8" y1="23" x2="16" y2="23"/>
+          </svg>
+        </button>
+        {!didConnected && (
+          <div style={{ color: "#888", fontSize: 28, marginTop: 20 }}>{didStatus}</div>
+        )}
+        {isListening && (
+          <div style={{ color: RED, fontSize: 32, fontWeight: 600, marginTop: 20 }}>Listening...</div>
+        )}
+      </div>
+
+
+      {/* ── Bottom Sponsor Bar ── */}
+      <div style={{
+        position: "absolute", left: 0, top: 3454, width: 2160, height: 386,
+      }}>
+        <img src="assets/sponsor-bar.png" alt="Sponsors" style={{
+          width: "100%", height: "100%", objectFit: "cover",
+        }} onError={(e) => {
+          e.target.outerHTML = '<div style="width:100%;height:100%;background:#f5f5f5;display:flex;align-items:center;justify-content:center;color:#ccc;font-size:40px;">Sponsor Bar</div>';
+        }} />
+      </div>
+
+
+      {!supported && didConnected && (
+        <div style={{
+          position: "absolute", bottom: 400, left: "50%", transform: "translateX(-50%)",
+          color: RED, fontSize: 32,
+        }}>Voice input not supported in this browser</div>
+      )}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
