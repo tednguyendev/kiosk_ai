@@ -211,20 +211,46 @@ const ICONS = {
 
 function App() {
   const [started, setStarted] = useState(false);
-  const [response, setResponse] = useState("");
+  const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const [didConnected, setDidConnected] = useState(false);
   const [videoReady, setVideoReady] = useState(false);
   const [didStatus, setDidStatus] = useState("Initializing...");
-  const [userText, setUserText] = useState("");
   const [filtered, setFiltered] = useState(false);
+  const [recommendations, setRecommendations] = useState([]);
+  const chatEndRef = useRef(null);
   const videoRef = useRef(null);
   const agentRef = useRef(null);
+  const pendingMessageRef = useRef(null);
+  const didConnectedRef = useRef(false);
+  const lastProcessedMsgCountRef = useRef(0);
+  const userHasSpokenRef = useRef(false);
   const { isListening, transcript, supported, startListening, stopListening } = useSpeechRecognition();
 
   const D_ID_API_KEY = window.__CONFIG?.D_ID_API_KEY;
   const D_ID_AGENT_ID = window.__CONFIG?.D_ID_AGENT_ID;
+
+  // Extract recommended stalls from AI response
+  function extractRecommendations(text) {
+    if (!text) return [];
+    const lowerText = text.toLowerCase();
+    // Match stall numbers mentioned (e.g. "Stall 10", "stall 15")
+    const stallMatches = [...lowerText.matchAll(/stall\s*(\d+)/g)].map(m => parseInt(m[1]));
+    return BRANDS.filter(b =>
+      stallMatches.includes(b.stall) ||
+      lowerText.includes(b.brand.toLowerCase()) ||
+      lowerText.includes(b.cuisine.toLowerCase()) ||
+      lowerText.includes(b.signature.toLowerCase())
+    );
+  }
+
+  // Auto-scroll chat to bottom
+  useEffect(() => {
+    if (chatEndRef.current) {
+      chatEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages, loading]);
 
   // Connect D-ID only after user clicks Start
   useEffect(() => {
@@ -254,11 +280,23 @@ function App() {
               setDidStatus(state);
               if (state === 'connected') {
                 setDidConnected(true);
+                didConnectedRef.current = true;
                 if (videoRef.current && videoRef.current.srcObject) {
                   videoRef.current.play().catch(() => {});
                 }
+                // If user already spoke, send their message; otherwise warmup avatar silently
                 setTimeout(() => {
-                  if (agentRef.current) {
+                  if (!agentRef.current) return;
+                  if (pendingMessageRef.current) {
+                    const text = pendingMessageRef.current;
+                    pendingMessageRef.current = null;
+                    setLoading(true);
+                    agentRef.current.chat(text).catch(err => {
+                      console.error("chat error:", err);
+                      setMessages(prev => [...prev, { role: 'assistant', content: "Error: " + (err.message || err) }]);
+                      setLoading(false);
+                    });
+                  } else {
                     agentRef.current.chat("Hello").catch(() => {});
                   }
                 }, 500);
@@ -275,10 +313,15 @@ function App() {
             },
             onNewMessage(msgs, type) {
               if (cancelled) return;
-              if (msgs.length > 0) {
-                const last = msgs[msgs.length - 1];
-                if (last.role === 'assistant' && last.content) {
-                  setResponse(last.content);
+              // Only process new messages (D-ID sends full history each time)
+              const newMsgs = msgs.slice(lastProcessedMsgCountRef.current);
+              lastProcessedMsgCountRef.current = msgs.length;
+              for (const msg of newMsgs) {
+                if (msg.role === 'assistant' && msg.content) {
+                  // Skip warmup response if user hasn't spoken yet
+                  if (!userHasSpokenRef.current) continue;
+                  setMessages(prev => [...prev, { role: 'assistant', content: msg.content }]);
+                  setRecommendations(extractRecommendations(msg.content));
                   setLoading(false);
                 }
               }
@@ -294,8 +337,14 @@ function App() {
       }
     }
     connectDID();
+    // Disconnect on tab close/refresh
+    const handleUnload = () => {
+      if (agentRef.current) agentRef.current.disconnect().catch(() => {});
+    };
+    window.addEventListener('beforeunload', handleUnload);
     return () => {
       cancelled = true;
+      window.removeEventListener('beforeunload', handleUnload);
       if (agentRef.current) agentRef.current.disconnect().catch(() => {});
     };
   }, [started]);
@@ -303,20 +352,27 @@ function App() {
   const micDisabled = speaking || loading;
 
   function sendToAgent(text) {
-    if (!text.trim() || !agentRef.current) return;
+    if (!text.trim()) return;
+    userHasSpokenRef.current = true;
     const check = filterMessage(text);
-    setUserText(text);
+    setMessages(prev => [...prev, { role: 'user', content: text }]);
     setFiltered(false);
     if (!check.allowed) {
-      setResponse(check.reason);
+      setMessages(prev => [...prev, { role: 'assistant', content: check.reason, filtered: true }]);
       setFiltered(true);
       return;
     }
-    setResponse("");
+    setRecommendations([]);
+    // If agent not connected yet, queue the message
+    if (!agentRef.current || !didConnectedRef.current) {
+      pendingMessageRef.current = text;
+      setLoading(true);
+      return;
+    }
     setLoading(true);
     agentRef.current.chat(text).catch(err => {
       console.error("chat error:", err);
-      setResponse("Error: " + (err.message || err));
+      setMessages(prev => [...prev, { role: 'assistant', content: "Error: " + (err.message || err) }]);
       setLoading(false);
     });
   }
@@ -326,15 +382,13 @@ function App() {
     if (isListening) {
       stopListening((text) => sendToAgent(text));
     } else {
-      setUserText("");
-      setResponse("");
       setFiltered(false);
       startListening();
     }
   }
 
   useEffect(() => {
-    if (!isListening && transcript.trim() && !userText && !loading) {
+    if (!isListening && transcript.trim() && !loading) {
       sendToAgent(transcript.trim());
     }
   }, [isListening]);
@@ -424,51 +478,90 @@ function App() {
         )}
       </div>
 
-      {/* ── Chat Bubble Area ── */}
+      {/* ── Chat Area (text message style) ── */}
       <div style={{
-        position: "absolute", left: 454, top: 744, width: 842,
+        position: "absolute", left: 400, top: 500, width: 900, height: 1150,
+        display: "flex", flexDirection: "column",
       }}>
-        {/* Name */}
         <div style={{
-          fontWeight: 600, fontSize: 40, lineHeight: "48px",
-          color: RED, textAlign: "right", marginBottom: 16,
-        }}>Kimberly</div>
-
-        {/* Chat bubble */}
-        <div style={{
-          background: "rgba(245, 177, 80, 0.6)",
-          borderRadius: 20, padding: "32px 46px",
-          minHeight: 218,
+          flex: 1, overflowY: "auto", padding: "20px 0",
+          display: "flex", flexDirection: "column", gap: 20,
         }}>
-          {isListening && (
-            <div style={{ fontSize: 32, lineHeight: "39px", color: "#000" }}>
-              {transcript || "Listening..."}
+          {/* Passive prompt if no messages yet */}
+          {messages.length === 0 && !loading && !isListening && (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
+              <div style={{
+                padding: "24px 32px", maxWidth: "85%",
+                fontSize: 32, lineHeight: "42px", color: "#888",
+              }}>
+                Tap the mic and ask me anything about our food stalls!
+              </div>
             </div>
           )}
-          {loading && (
-            <div style={{ fontSize: 32, lineHeight: "39px", color: "#666" }}>Thinking...</div>
-          )}
-          {response && !loading && !isListening && (
-            <div style={{
-              fontSize: 32, lineHeight: "39px",
-              color: filtered ? "#CF463A" : "#000",
-            }}>
-              {response}
-            </div>
-          )}
-          {!response && !loading && !isListening && (
-            <div style={{ fontSize: 32, lineHeight: "39px", color: "#000" }}>
-              Hello! I'm Kimberly, your AI concierge here at Kopitiam, Tan Tock Seng Hospital. We have 21 food stalls with local favourites, halal options, and more. What are you in the mood for?
-            </div>
-          )}
-        </div>
 
-        {/* User text */}
-        {userText && !isListening && (
-          <div style={{ fontSize: 28, color: "#888", marginTop: 16 }}>
-            You said: "{userText}"
-          </div>
-        )}
+          {/* Message history */}
+          {messages.map((msg, i) => (
+            msg.role === 'user' ? (
+              <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+                <div style={{ fontWeight: 600, fontSize: 30, color: "#555", marginBottom: 8 }}>You</div>
+                <div style={{
+                  background: RED,
+                  borderRadius: "20px 20px 4px 20px",
+                  padding: "24px 32px", maxWidth: "85%",
+                  fontSize: 32, lineHeight: "42px", color: WHITE,
+                }}>
+                  {msg.content}
+                </div>
+              </div>
+            ) : (
+              <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
+                <div style={{ fontWeight: 600, fontSize: 30, color: RED, marginBottom: 8 }}>Kimberly</div>
+                <div style={{
+                  background: "rgba(245, 177, 80, 0.6)",
+                  borderRadius: "20px 20px 20px 4px",
+                  padding: "24px 32px", maxWidth: "85%",
+                  fontSize: 32, lineHeight: "42px",
+                  color: msg.filtered ? RED : "#000",
+                }}>
+                  {msg.content}
+                </div>
+              </div>
+            )
+          ))}
+
+          {/* Listening indicator */}
+          {isListening && (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+              <div style={{ fontWeight: 600, fontSize: 30, color: "#555", marginBottom: 8 }}>You</div>
+              <div style={{
+                background: "rgba(207,70,58,0.15)",
+                borderRadius: "20px 20px 4px 20px",
+                padding: "24px 32px", maxWidth: "85%",
+                fontSize: 32, lineHeight: "42px", color: RED,
+                border: `2px dashed ${RED}`,
+              }}>
+                {transcript || "Listening..."}
+              </div>
+            </div>
+          )}
+
+          {/* Loading indicator */}
+          {loading && (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
+              <div style={{ fontWeight: 600, fontSize: 30, color: RED, marginBottom: 8 }}>Kimberly</div>
+              <div style={{
+                background: "rgba(245, 177, 80, 0.3)",
+                borderRadius: "20px 20px 20px 4px",
+                padding: "24px 32px",
+                fontSize: 32, lineHeight: "42px", color: "#666",
+              }}>
+                <span style={{ animation: "pulse 1.5s infinite" }}>Thinking...</span>
+              </div>
+            </div>
+          )}
+
+          <div ref={chatEndRef} />
+        </div>
       </div>
 
       {/* ── White content area (mid section) ── */}
@@ -512,6 +605,58 @@ function App() {
         )}
       </div>
 
+
+      {/* ── Kimberly's Recommendation ── */}
+      <div style={{
+        position: "absolute", left: 0, top: 2100, width: 2160,
+        padding: "0 80px",
+      }}>
+        <div style={{
+          fontWeight: 600, fontSize: 48, color: RED, marginBottom: 30,
+        }}>Kimberly's Recommendation</div>
+
+        {recommendations.length > 0 && (
+          <div style={{
+            display: "flex", gap: 30, overflowX: "auto",
+            paddingBottom: 20,
+          }}>
+            {recommendations.map((brand, i) => (
+              <div key={i} style={{
+                minWidth: 580, background: WHITE,
+                borderRadius: 30, padding: "40px 36px",
+                boxShadow: "0 4px 30px rgba(0,0,0,0.1)",
+                border: `3px solid ${GOLD}`,
+                flexShrink: 0,
+              }}>
+                <div style={{
+                  display: "flex", justifyContent: "space-between", alignItems: "flex-start",
+                  marginBottom: 16,
+                }}>
+                  <div style={{
+                    fontWeight: 700, fontSize: 38, color: DARK_TEXT,
+                    lineHeight: "46px", flex: 1,
+                  }}>{brand.brand}</div>
+                  <div style={{
+                    background: brand.halal ? "#2E7D32" : "#888",
+                    color: WHITE, fontSize: 26, fontWeight: 600,
+                    padding: "6px 18px", borderRadius: 20,
+                    marginLeft: 16, whiteSpace: "nowrap",
+                  }}>{brand.halal ? "Halal" : "Non-Halal"}</div>
+                </div>
+                <div style={{
+                  fontSize: 30, color: RED, fontWeight: 600, marginBottom: 12,
+                }}>Stall {brand.stall} · {brand.cuisine}</div>
+                <div style={{
+                  fontSize: 30, color: "#666", fontWeight: 500, marginBottom: 12,
+                }}>★ {brand.signature}</div>
+                <div style={{
+                  fontSize: 28, color: "#888", lineHeight: "38px",
+                }}>{brand.desc}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* ── Bottom Sponsor Bar ── */}
       <div style={{
