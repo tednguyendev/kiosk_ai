@@ -1,7 +1,9 @@
 const express = require('express');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
+const cors = require('cors');
 const app = express();
+app.use(cors());
 app.use(express.json());
 
 const PORT = process.env.PORT || 3100;
@@ -108,6 +110,31 @@ async function handleChat(req, res) {
       res.end();
     }
   }
+}
+
+// OpenAI-compatible models endpoint (D-ID fetches this to validate)
+// Log all incoming requests for debugging
+app.use((req, res, next) => {
+  console.log(`${req.method} ${req.path}`, JSON.stringify(req.headers));
+  next();
+});
+
+// Normalize double slashes from base URL trailing slash
+app.use((req, res, next) => {
+  req.url = req.url.replace(/\/\//g, '/');
+  next();
+});
+
+app.get('/models', modelsHandler);
+app.get('/v1/models', modelsHandler);
+
+function modelsHandler(req, res) {
+  res.json({
+    object: 'list',
+    data: [
+      { id: 'gemini-2.0-flash', object: 'model', owned_by: 'google' }
+    ]
+  });
 }
 
 // Health check

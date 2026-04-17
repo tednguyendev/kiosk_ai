@@ -7,7 +7,9 @@
 <script>
 window.__CONFIG = {
   D_ID_API_KEY: 'aW12bXMyMDVAZ21haWwuY29t:mxgYbhVrC7OAYz1nzj561',
-  D_ID_AGENT_ID: 'v2_agt_LJ2exBPU'
+  D_ID_AGENT_ID: 'v2_agt_LJ2exBPU',
+  GEMINI_API_KEY: 'AIzaSyAHCe88d2e8jrApLX9KKyaKEyU-ZJx9a54',
+  GEMINI_MODEL: 'gemini-2.0-flash'
 };
 </script>
 <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
@@ -18,6 +20,7 @@ window.__CONFIG = {
   window.__DID = did;
   window.__DID_READY = true;
   window.dispatchEvent(new Event('did-ready'));
+  console.log('D-ID SDK loaded:', Object.keys(did));
 </script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
@@ -207,6 +210,39 @@ const ICONS = {
   mic: `<svg width="127" height="123" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>`,
 };
 
+// ─── Gemini LLM ───
+
+const SYSTEM_PROMPT = `You are Kimberly, AI concierge at ${MALL_NAME}. There are 21 stalls.
+When recommending food, always mention the stall number (e.g. "Stall 5").
+Be friendly, concise, and helpful. Keep responses under 3-4 sentences.
+Here is the stall directory:\n` + BRANDS.map(b =>
+  `Stall ${b.stall}: ${b.brand} (${b.cuisine})${b.halal ? ' [Halal]' : ''} - ${b.signature}. ${b.desc}`
+).join('\n');
+
+async function callGemini(conversationHistory) {
+  const GEMINI_API_KEY = window.__CONFIG.GEMINI_API_KEY;
+  const GEMINI_MODEL = window.__CONFIG.GEMINI_MODEL;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+
+  const contents = conversationHistory.map(msg => ({
+    role: msg.role === 'assistant' ? 'model' : 'user',
+    parts: [{ text: msg.content }]
+  }));
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+      contents,
+    })
+  });
+
+  if (!res.ok) throw new Error(`Gemini API error: ${res.status}`);
+  const data = await res.json();
+  return data.candidates?.[0]?.content?.parts?.[0]?.text || 'Sorry, I could not generate a response.';
+}
+
 // ─── App ───
 
 function App() {
@@ -275,7 +311,7 @@ function App() {
                 }
                 setTimeout(() => {
                   if (agentRef.current) {
-                    agentRef.current.chat("Hello").catch(() => {});
+                    agentRef.current.speak({ type: 'text', input: 'Hello! I\'m Kimberly, your AI concierge here at Kopitiam. What are you in the mood for today?' }).catch(() => {});
                   }
                 }, 500);
                 setTimeout(() => { setVideoReady(true); }, 4000);
@@ -290,29 +326,14 @@ function App() {
               }
             },
             onNewMessage(msgs, type) {
-              if (cancelled) return;
-              if (msgs.length > 0) {
-                const last = msgs[msgs.length - 1];
-                if (last.role === 'assistant' && last.content) {
-                  setMessages(prev => {
-                    // Update last assistant message if it exists (streaming chunks)
-                    if (prev.length > 0 && prev[prev.length - 1].role === 'assistant') {
-                      const updated = [...prev];
-                      updated[updated.length - 1] = { role: 'assistant', content: last.content };
-                      return updated;
-                    }
-                    // Otherwise add new assistant message
-                    return [...prev, { role: 'assistant', content: last.content }];
-                  });
-                  setRecommendations(extractRecommendations(last.content));
-                  setLoading(false);
-                }
-              }
+              // Messages handled by Gemini directly, not D-ID LLM
             }
           },
           streamOptions: { compatibilityMode: 'auto', streamWarmup: true }
         });
         agentRef.current = agent;
+        window.__agentRef = agent;
+        console.log('Agent methods:', Object.getOwnPropertyNames(Object.getPrototypeOf(agent)));
         await agent.connect();
       } catch (err) {
         console.error("D-ID connect error:", err);
@@ -328,10 +349,11 @@ function App() {
 
   const micDisabled = speaking || loading || !didConnected;
 
-  function sendToAgent(text) {
+  async function sendToAgent(text) {
     if (!text.trim() || !agentRef.current) return;
     const check = filterMessage(text);
-    setMessages(prev => [...prev, { role: 'user', content: text }]);
+    const userMsg = { role: 'user', content: text };
+    setMessages(prev => [...prev, userMsg]);
     setFiltered(false);
     if (!check.allowed) {
       setMessages(prev => [...prev, { role: 'assistant', content: check.reason, filtered: true }]);
@@ -340,11 +362,27 @@ function App() {
     }
     setRecommendations([]);
     setLoading(true);
-    agentRef.current.chat(text).catch(err => {
-      console.error("chat error:", err);
+    try {
+      // Build conversation history for Gemini
+      const history = [...messages, userMsg].filter(m => !m.filtered);
+      const reply = await callGemini(history);
+      const assistantMsg = { role: 'assistant', content: reply };
+      setMessages(prev => [...prev, assistantMsg]);
+      setRecommendations(extractRecommendations(reply));
+      setLoading(false);
+      // Make avatar speak the response
+      console.log('Calling speak, method exists:', typeof agentRef.current.speak);
+      try {
+        const speakResult = await agentRef.current.speak({ type: 'text', input: reply });
+        console.log('speak result:', speakResult);
+      } catch (speakErr) {
+        console.error("speak error:", speakErr);
+      }
+    } catch (err) {
+      console.error("Gemini error:", err);
       setMessages(prev => [...prev, { role: 'assistant', content: "Error: " + (err.message || err) }]);
       setLoading(false);
-    });
+    }
   }
 
   function handleMicClick() {
