@@ -9,7 +9,8 @@ window.__CONFIG = {
   D_ID_API_KEY: 'aW12bXMyMDVAZ21haWwuY29t:mxgYbhVrC7OAYz1nzj561',
   D_ID_AGENT_ID: 'v2_agt_LJ2exBPU',
   GEMINI_API_KEY: 'AIzaSyAHCe88d2e8jrApLX9KKyaKEyU-ZJx9a54',
-  GEMINI_MODEL: 'gemini-2.0-flash'
+  GEMINI_MODEL: 'gemini-2.0-flash',
+  OPENAI_API_KEY: 'YOUR_OPENAI_API_KEY'
 };
 </script>
 <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
@@ -113,64 +114,99 @@ function filterMessage(text) {
   return { allowed: true };
 }
 
-// ─── Speech Recognition Hook (tap-to-talk) ───
+// ─── Whisper Speech Recognition Hook (tap-to-talk) ───
+
+async function transcribeAudio(audioBlob) {
+  const GEMINI_API_KEY = window.__CONFIG.GEMINI_API_KEY;
+  const base64 = await new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result.split(',')[1]);
+    reader.readAsDataURL(audioBlob);
+  });
+
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{
+        parts: [
+          { inline_data: { mime_type: 'audio/webm', data: base64 } },
+          { text: 'Transcribe this audio exactly. Return only the transcribed text, nothing else.' }
+        ]
+      }]
+    })
+  });
+
+  if (!res.ok) throw new Error(`Gemini transcription error: ${res.status}`);
+  const data = await res.json();
+  return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
+}
 
 function useSpeechRecognition() {
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [supported, setSupported] = useState(true);
-  const recognitionRef = useRef(null);
-  const transcriptRef = useRef("");
+  const mediaRecorderRef = useRef(null);
+  const chunksRef = useRef([]);
   const onEndCallbackRef = useRef(null);
 
   useEffect(() => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) { setSupported(false); return; }
-    const recognition = new SpeechRecognition();
-    recognition.lang = "en-US";
-    recognition.continuous = false;
-    recognition.interimResults = true;
-
-    recognition.onresult = (event) => {
-      let text = "";
-      for (let i = 0; i < event.results.length; i++) {
-        text += event.results[i][0].transcript;
-      }
-      transcriptRef.current = text;
-      setTranscript(text);
-    };
-
-    recognition.onend = () => {
-      setIsListening(false);
-      const cb = onEndCallbackRef.current;
-      const text = transcriptRef.current;
-      onEndCallbackRef.current = null;
-      if (cb && text.trim()) {
-        cb(text.trim());
-      }
-    };
-    recognition.onerror = (e) => {
-      console.error("Speech error:", e.error);
-      setIsListening(false);
-      onEndCallbackRef.current = null;
-    };
-
-    recognitionRef.current = recognition;
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setSupported(false);
+    }
   }, []);
 
-  const startListening = useCallback(() => {
-    if (recognitionRef.current && !isListening) {
-      transcriptRef.current = "";
+  const startListening = useCallback(async () => {
+    if (isListening) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+      chunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
+
+      mediaRecorder.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop());
+        const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
+        console.log('Recording stopped, blob size:', blob.size, 'chunks:', chunksRef.current.length);
+        const cb = onEndCallbackRef.current;
+        onEndCallbackRef.current = null;
+
+        if (blob.size > 0) {
+          try {
+            setTranscript("Transcribing...");
+            const text = await transcribeAudio(blob);
+            console.log('Whisper result:', text);
+            setTranscript(text);
+            setIsListening(false);
+            if (cb && text.trim()) cb(text.trim());
+          } catch (err) {
+            console.error("Whisper error:", err);
+            setTranscript("");
+            setIsListening(false);
+          }
+        } else {
+          console.log('Empty blob, skipping');
+          setIsListening(false);
+        }
+      };
+
+      mediaRecorderRef.current = mediaRecorder;
+      mediaRecorder.start();
       setTranscript("");
-      recognitionRef.current.start();
       setIsListening(true);
+    } catch (err) {
+      console.error("Mic access error:", err);
+      setSupported(false);
     }
   }, [isListening]);
 
   const stopListening = useCallback((onEnd) => {
-    if (recognitionRef.current && isListening) {
+    if (mediaRecorderRef.current && isListening) {
       onEndCallbackRef.current = onEnd;
-      recognitionRef.current.stop();
+      mediaRecorderRef.current.stop();
     }
   }, [isListening]);
 
@@ -215,7 +251,7 @@ const ICONS = {
 const SYSTEM_PROMPT = `You are Kimberly, AI concierge at ${MALL_NAME}. There are 21 stalls.
 IMPORTANT: Always recommend exactly ONE stall and ONE dish. Never suggest multiple stalls or multiple dishes. Pick the single best match for what the person wants.
 When recommending, always mention the stall number (e.g. "Stall 5").
-Be friendly, concise, and helpful. Keep responses under 2-3 sentences.
+Be friendly, warm, and conversational. Respond in 4-6 sentences — enough to feel like a natural spoken recommendation.
 Here is the stall directory:\n` + BRANDS.map(b =>
   `Stall ${b.stall}: ${b.brand} (${b.cuisine})${b.halal ? ' [Halal]' : ''} - ${b.signature}. ${b.desc}`
 ).join('\n');
@@ -312,7 +348,7 @@ function App() {
                 }
                 setTimeout(() => {
                   if (agentRef.current) {
-                    agentRef.current.speak({ type: 'text', input: 'Hello! I\'m Kimberly, your AI concierge here at Kopitiam. What are you in the mood for today?' }).catch(() => {});
+                    agentRef.current.speak({ type: 'text', input: 'Hello! I am Kimberly, your AI concierge here at Kopitiam. What are you in the mood for today?' }).catch(() => {});
                   }
                 }, 500);
                 setTimeout(() => { setVideoReady(true); }, 4000);
@@ -372,13 +408,9 @@ function App() {
       setRecommendations(extractRecommendations(reply));
       setLoading(false);
       // Make avatar speak the response
-      console.log('Calling speak, method exists:', typeof agentRef.current.speak);
-      try {
-        const speakResult = await agentRef.current.speak({ type: 'text', input: reply });
-        console.log('speak result:', speakResult);
-      } catch (speakErr) {
-        console.error("speak error:", speakErr);
-      }
+      agentRef.current.speak({ type: 'text', input: reply }).catch(err => {
+        console.error("speak error:", err);
+      });
     } catch (err) {
       console.error("Gemini error:", err);
       setMessages(prev => [...prev, { role: 'assistant', content: "Error: " + (err.message || err) }]);
@@ -386,20 +418,21 @@ function App() {
     }
   }
 
+  const pendingTranscriptRef = useRef(null);
+
   function handleMicClick() {
     if (micDisabled) return;
     if (isListening) {
-      stopListening((text) => sendToAgent(text));
+      console.log('Stopping recording...');
+      stopListening((text) => {
+        console.log('stopListening callback, text:', text);
+        sendToAgent(text);
+      });
     } else {
+      console.log('Starting recording...');
       startListening();
     }
   }
-
-  useEffect(() => {
-    if (!isListening && transcript.trim() && !loading) {
-      sendToAgent(transcript.trim());
-    }
-  }, [isListening]);
 
   // ─── Start Screen ───
   if (!started) {
