@@ -380,9 +380,23 @@ function App() {
       }
     }
     connectDID();
+
+    // Disconnect when tab closes/hides so D-ID session is released server-side
+    const handleUnload = () => {
+      try { agentRef.current && agentRef.current.disconnect(); } catch (e) {}
+      agentRef.current = null;
+    };
+    window.addEventListener('pagehide', handleUnload);
+    window.addEventListener('beforeunload', handleUnload);
+
     return () => {
       cancelled = true;
-      if (agentRef.current) agentRef.current.disconnect().catch(() => {});
+      window.removeEventListener('pagehide', handleUnload);
+      window.removeEventListener('beforeunload', handleUnload);
+      if (agentRef.current) {
+        try { agentRef.current.disconnect().catch(() => {}); } catch (e) {}
+        agentRef.current = null;
+      }
     };
   }, [started]);
 
@@ -711,6 +725,28 @@ function App() {
         }} />
       </div>
 
+
+      {/* ── Restart Conversation Button (bottom left) ── */}
+      <button disabled={speaking || loading} onClick={() => {
+        setMessages([]);
+        setRecommendations([]);
+        setFiltered(false);
+        setLoading(false);
+      }} style={{
+        position: "absolute", left: 80, top: 1891,
+        transform: "translateY(-50%)",
+        padding: "24px 48px",
+        background: WHITE,
+        border: "3px solid #ccc",
+        borderRadius: 20,
+        fontSize: 36, fontWeight: 500,
+        color: DARK_TEXT,
+        cursor: (speaking || loading) ? "not-allowed" : "pointer",
+        opacity: (speaking || loading) ? 0.4 : 1,
+        transition: "opacity 0.3s",
+      }}>
+        Restart Conversation
+      </button>
 
       {!supported && didConnected && (
         <div style={{
