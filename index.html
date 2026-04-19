@@ -727,7 +727,7 @@ function App() {
 
 
       {/* ── Restart Conversation Button (bottom left) ── */}
-      <button disabled={messages.length === 0} onClick={() => {
+      <button disabled={messages.length === 0 || speaking || loading} onClick={() => {
         setMessages([]);
         setRecommendations([]);
         setFiltered(false);
@@ -741,8 +741,8 @@ function App() {
         borderRadius: 20,
         fontSize: 36, fontWeight: 500,
         color: DARK_TEXT,
-        cursor: messages.length === 0 ? "not-allowed" : "pointer",
-        opacity: messages.length === 0 ? 0.4 : 1,
+        cursor: (messages.length === 0 || speaking || loading) ? "not-allowed" : "pointer",
+        opacity: (messages.length === 0 || speaking || loading) ? 0.4 : 1,
         transition: "opacity 0.3s",
       }}>
         Restart Conversation
