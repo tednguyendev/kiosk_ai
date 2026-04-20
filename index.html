@@ -117,29 +117,24 @@ function filterMessage(text) {
 // ─── Whisper Speech Recognition Hook (tap-to-talk) ───
 
 async function transcribeAudio(audioBlob) {
-  const GEMINI_API_KEY = window.__CONFIG.GEMINI_API_KEY;
-  const base64 = await new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onloadend = () => resolve(reader.result.split(',')[1]);
-    reader.readAsDataURL(audioBlob);
-  });
+  const OPENAI_API_KEY = window.__CONFIG.OPENAI_API_KEY;
+  const formData = new FormData();
+  formData.append('file', audioBlob, 'audio.webm');
+  formData.append('model', 'whisper-1');
 
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`, {
+  console.log('[Whisper] sending blob, size:', audioBlob.size, 'type:', audioBlob.type);
+  const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{
-        parts: [
-          { inline_data: { mime_type: 'audio/webm', data: base64 } },
-          { text: 'Transcribe this audio exactly. Return only the transcribed text, nothing else.' }
-        ]
-      }]
-    })
+    headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}` },
+    body: formData,
   });
 
-  if (!res.ok) throw new Error(`Gemini transcription error: ${res.status}`);
-  const data = await res.json();
-  return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
+  const raw = await res.text();
+  console.log('[Whisper] status:', res.status, 'body:', raw);
+  if (!res.ok) throw new Error(`Whisper ${res.status}: ${raw}`);
+  let data;
+  try { data = JSON.parse(raw); } catch { throw new Error('Whisper bad JSON: ' + raw); }
+  return (data.text || '').trim();
 }
 
 function useSpeechRecognition() {
@@ -297,6 +292,9 @@ function App() {
   const videoRef = useRef(null);
   const agentRef = useRef(null);
   const chatEndRef = useRef(null);
+  const userSpokeFirstRef = useRef(false);
+  const greetingTimeoutRef = useRef(null);
+  const pendingSpeakRef = useRef(null);
   const { isListening, transcript, supported, startListening, stopListening } = useSpeechRecognition();
 
   const D_ID_API_KEY = window.__CONFIG?.D_ID_API_KEY;
@@ -348,11 +346,21 @@ function App() {
                 if (videoRef.current && videoRef.current.srcObject) {
                   videoRef.current.play().catch(() => {});
                 }
-                setTimeout(() => {
-                  if (agentRef.current) {
-                    agentRef.current.speak({ type: 'text', input: 'Hello! I am Kimberly, your AI concierge here at Kopitiam. What are you in the mood for today?' }).catch(() => {});
-                  }
-                }, 500);
+                // If user already spoke, speak their queued response instead of greeting
+                if (pendingSpeakRef.current) {
+                  const text = pendingSpeakRef.current;
+                  pendingSpeakRef.current = null;
+                  setTimeout(() => {
+                    if (agentRef.current) agentRef.current.speak({ type: 'text', input: text }).catch(() => {});
+                  }, 500);
+                } else if (!userSpokeFirstRef.current) {
+                  // Only greet if user hasn't started talking
+                  greetingTimeoutRef.current = setTimeout(() => {
+                    if (agentRef.current && !userSpokeFirstRef.current) {
+                      agentRef.current.speak({ type: 'text', input: 'Hello! I am Kimberly, your AI concierge here at Kopitiam. What are you in the mood for today?' }).catch(() => {});
+                    }
+                  }, 500);
+                }
                 setTimeout(() => { setVideoReady(true); }, 4000);
               }
             },
@@ -400,10 +408,10 @@ function App() {
     };
   }, [started]);
 
-  const micDisabled = speaking || loading || !didConnected;
+  const micDisabled = speaking || loading;
 
   async function sendToAgent(text) {
-    if (!text.trim() || !agentRef.current) return;
+    if (!text.trim()) return;
     const check = filterMessage(text);
     const userMsg = { role: 'user', content: text };
     setMessages(prev => [...prev, userMsg]);
@@ -423,10 +431,14 @@ function App() {
       setMessages(prev => [...prev, assistantMsg]);
       setRecommendations(extractRecommendations(reply));
       setLoading(false);
-      // Make avatar speak the response
-      agentRef.current.speak({ type: 'text', input: reply }).catch(err => {
-        console.error("speak error:", err);
-      });
+      // Make avatar speak the response (or queue if D-ID not ready)
+      if (agentRef.current && didConnected) {
+        agentRef.current.speak({ type: 'text', input: reply }).catch(err => {
+          console.error("speak error:", err);
+        });
+      } else {
+        pendingSpeakRef.current = reply;
+      }
     } catch (err) {
       console.error("Gemini error:", err);
       setMessages(prev => [...prev, { role: 'assistant', content: "Error: " + (err.message || err) }]);
@@ -446,6 +458,12 @@ function App() {
       });
     } else {
       console.log('Starting recording...');
+      // Cancel AI greeting if user talks first
+      userSpokeFirstRef.current = true;
+      if (greetingTimeoutRef.current) {
+        clearTimeout(greetingTimeoutRef.current);
+        greetingTimeoutRef.current = null;
+      }
       startListening();
     }
   }
@@ -732,6 +750,8 @@ function App() {
         setRecommendations([]);
         setFiltered(false);
         setLoading(false);
+        userSpokeFirstRef.current = false;
+        pendingSpeakRef.current = null;
       }} style={{
         position: "absolute", left: 80, top: 1891,
         transform: "translateY(-50%)",
