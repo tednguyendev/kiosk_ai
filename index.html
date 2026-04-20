@@ -9,7 +9,7 @@ window.__CONFIG = {
   D_ID_API_KEY: 'aW12bXMyMDVAZ21haWwuY29t:mxgYbhVrC7OAYz1nzj561',
   D_ID_AGENT_ID: 'v2_agt_LJ2exBPU',
   GEMINI_API_KEY: 'AIzaSyAHCe88d2e8jrApLX9KKyaKEyU-ZJx9a54',
-  GEMINI_MODEL: 'gemini-2.0-flash',
+  GEMINI_MODEL: 'gemini-3-flash-preview',
   OPENAI_API_KEY: 'YOUR_OPENAI_API_KEY'
 };
 </script>
@@ -752,6 +752,12 @@ function App() {
         setLoading(false);
         userSpokeFirstRef.current = false;
         pendingSpeakRef.current = null;
+        const greeting = 'Hello! I am Kimberly, your AI concierge here at Kopitiam. What are you in the mood for today?';
+        if (agentRef.current && didConnected) {
+          agentRef.current.speak({ type: 'text', input: greeting }).catch(() => {});
+        } else {
+          pendingSpeakRef.current = greeting;
+        }
       }} style={{
         position: "absolute", left: 80, top: 1891,
         transform: "translateY(-50%)",
