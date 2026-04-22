@@ -433,6 +433,7 @@ When recommending, always mention the stall number (e.g. "Stall 5").
 ALWAYS make a recommendation — never just ask a clarifying question. Even if the request is vague (e.g. "food stores", "what do you have"), pick your top recommendation and offer it.
 For health-related requests (gastric, sore throat, flu, post-surgery), recommend light and gentle options like porridge (Stall 8), vegetarian (Stall 5), or soup (Stall 10/11). Avoid heavy or rich dishes like organ meats.
 Be friendly, warm, and conversational. Always respond in 4-6 sentences — never fewer than 4.
+Reply in plain text only. Do not use markdown, asterisks, bold, italics, bullet points, or any formatting symbols — the text is spoken aloud.
 Here is the stall directory:\n` + BRANDS.map(b =>
   `Stall ${b.stall}: ${b.brand} (${b.cuisine})${b.halal ? ' [Halal]' : ''} - ${b.signature}. ${b.desc}`
 ).join('\n');
@@ -458,7 +459,16 @@ async function callGemini(conversationHistory) {
 
   if (!res.ok) throw new Error(`Gemini API error: ${res.status}`);
   const data = await res.json();
-  return data.candidates?.[0]?.content?.parts?.[0]?.text || 'Sorry, I could not generate a response.';
+  const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || 'Sorry, I could not generate a response.';
+  // Strip markdown emphasis so D-ID doesn't speak the literal "asterisk asterisk".
+  return raw
+    .replace(/\*\*(.*?)\*\*/g, '$1')   // **bold**
+    .replace(/\*(.*?)\*/g, '$1')       // *italic*
+    .replace(/_{1,2}(.*?)_{1,2}/g, '$1') // __bold__ / _italic_
+    .replace(/`([^`]+)`/g, '$1')       // `code`
+    .replace(/^\s*[-*+]\s+/gm, '')     // bullet list markers
+    .replace(/\s{2,}/g, ' ')
+    .trim();
 }
 
 // ─── App ───
@@ -480,6 +490,10 @@ function App() {
   const userSpokeFirstRef = useRef(false);
   const greetingTimeoutRef = useRef(null);
   const pendingSpeakRef = useRef(null);
+  // Mirror didConnected into a ref so sendToAgent doesn't read a stale value from its closure
+  // when Gemini returns after D-ID finishes connecting (race condition: otherwise pendingSpeakRef is set
+  // but the 'connected' event already fired with nothing to speak, leaving the UI stuck loading).
+  const didConnectedRef = useRef(false);
 
   const D_ID_API_KEY = window.__CONFIG?.D_ID_API_KEY;
   const D_ID_AGENT_ID = window.__CONFIG?.D_ID_AGENT_ID;
@@ -527,6 +541,7 @@ function App() {
               setDidStatus(state);
               if (state === 'connected') {
                 setDidConnected(true);
+                didConnectedRef.current = true;
                 if (videoRef.current && videoRef.current.srcObject) {
                   videoRef.current.play().catch(() => {});
                 }
@@ -581,6 +596,12 @@ function App() {
         agentRef.current = agent;
         window.__agentRef = agent;
         console.log('Agent methods:', Object.getOwnPropertyNames(Object.getPrototypeOf(agent)));
+        // Test hook: ?delay_did=N stalls D-ID connect by N ms so we can reproduce the speak-first race.
+        const delayMs = parseInt(new URLSearchParams(location.search).get('delay_did') || '0', 10);
+        if (delayMs > 0) {
+          console.log('[TEST] delaying D-ID connect by', delayMs, 'ms');
+          await new Promise(r => setTimeout(r, delayMs));
+        }
         await agent.connect();
       } catch (err) {
         console.error("D-ID connect error:", err);
@@ -677,7 +698,7 @@ function App() {
       const assistantMsg = { role: 'assistant', content: reply };
       setMessages(prev => [...prev, assistantMsg]);
       setRecommendations(extractRecommendations(reply));
-      if (agentRef.current && didConnected) {
+      if (agentRef.current && didConnectedRef.current) {
         setLoading(false);
         perf.speakCall = performance.now();
         agentRef.current.speak({ type: 'text', input: reply }).catch(err => {
@@ -695,6 +716,21 @@ function App() {
   }
 
   useEffect(() => { sendToAgentRef.current = sendToAgent; });
+
+  // Test hooks for playwright/manual QA — inspect refs and inject utterances without a mic.
+  useEffect(() => {
+    window.__test = {
+      sendToAgent: (text) => sendToAgentRef.current && sendToAgentRef.current(text),
+      getState: () => ({
+        loading, speaking, didConnected,
+        userSpokeFirst: userSpokeFirstRef.current,
+        pendingSpeak: pendingSpeakRef.current,
+        messagesCount: messages.length,
+        lastMessage: messages[messages.length - 1],
+      }),
+      markUserSpokeFirst: () => { userSpokeFirstRef.current = true; },
+    };
+  }, [loading, speaking, didConnected, messages]);
 
   // ─── Start Screen ───
   if (!started) {
