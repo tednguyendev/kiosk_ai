@@ -146,6 +146,7 @@ async function transcribeAudio(audioBlob) {
   formData.append('language', 'en');      // lock to English — prevents JP/other hallucination
   formData.append('temperature', '0');    // deterministic, reduces invented text
   formData.append('prompt', 'Food court customer asking about stalls, dishes, halal options.');
+  formData.append('response_format', 'verbose_json'); // need segments for confidence scoring
 
   console.log('[Whisper] sending blob, size:', audioBlob.size, 'type:', audioBlob.type);
   perf.whisperStart = performance.now();
@@ -162,8 +163,25 @@ async function transcribeAudio(audioBlob) {
   if (!res.ok) throw new Error(`Whisper ${res.status}: ${raw}`);
   let data;
   try { data = JSON.parse(raw); } catch { throw new Error('Whisper bad JSON: ' + raw); }
-  return (data.text || '').trim();
+  const segments = data.segments || [];
+  const noSpeechProb = segments.length
+    ? Math.max(...segments.map(s => s.no_speech_prob ?? 0))
+    : 0;
+  const avgLogprob = segments.length
+    ? Math.min(...segments.map(s => s.avg_logprob ?? 0))
+    : 0;
+  return {
+    text: (data.text || '').trim(),
+    noSpeechProb,
+    avgLogprob,
+  };
 }
+
+// Whisper confidence thresholds — flag hallucinations Whisper itself is unsure about.
+// no_speech_prob > 0.6: Whisper thinks this segment was actually silence.
+// avg_logprob < -1.0: low per-token confidence, usually noise-to-text guesses.
+const WHISPER_NO_SPEECH_THRESHOLD = 0.6;
+const WHISPER_LOGPROB_THRESHOLD = -1.0;
 
 // Known Whisper hallucinations. Substring match (normalized) — Whisper often concatenates these into longer sentences.
 const WHISPER_HALLUCINATION_SUBSTRINGS = [
@@ -172,6 +190,7 @@ const WHISPER_HALLUCINATION_SUBSTRINGS = [
   'dont forget to like', 'dont forget to subscribe',
   'see you next time', 'see you in the next video',
   'hit the bell', 'ring the bell',
+  'pissedconsumer', 'please see review', 'review no',
 ];
 const WHISPER_HALLUCINATION_EXACT = [
   'you', 'thank you', 'thanks', 'bye', 'okay', 'ok',
@@ -183,6 +202,8 @@ function isHallucination(text) {
   if (norm.length < 2) return true;
   if (WHISPER_HALLUCINATION_EXACT.includes(norm)) return true;
   if (WHISPER_HALLUCINATION_SUBSTRINGS.some(sub => norm.includes(sub))) return true;
+  // URLs or domain names — food-court customers don't say these aloud
+  if (/\b(?:https?:\/\/|www\.|\.com|\.org|\.net|\.io)\b/i.test(text)) return true;
   // Any non-ASCII response when we asked for English = hallucination
   if (/[^\x00-\x7F]/.test(text)) return true;
   return false;
@@ -340,15 +361,17 @@ function useVoiceActivity({ enabled, paused, onUtterance, onRejected }) {
           }
           setIsTranscribing(true);
           try {
-            const text = await transcribeAudio(blob);
+            const { text, noSpeechProb, avgLogprob } = await transcribeAudio(blob);
             const clean = (text || '').trim();
-            console.log('[VAD] Whisper:', JSON.stringify(clean));
-            if (clean && !isHallucination(clean) && onUtteranceRef.current) {
+            console.log('[VAD] Whisper:', JSON.stringify(clean), 'no_speech:', noSpeechProb.toFixed(2), 'logprob:', avgLogprob.toFixed(2));
+            const lowConfidence = noSpeechProb > WHISPER_NO_SPEECH_THRESHOLD || avgLogprob < WHISPER_LOGPROB_THRESHOLD;
+            if (clean && !isHallucination(clean) && !lowConfidence && onUtteranceRef.current) {
               onUtteranceRef.current(clean);
             } else {
-              console.log('[VAD] rejected (empty or hallucination):', JSON.stringify(clean));
+              const reason = !clean ? 'empty' : lowConfidence ? 'low-confidence' : 'hallucination';
+              console.log('[VAD] rejected (' + reason + '):', JSON.stringify(clean));
               committedRef.current = false;
-              if (onRejectedRef.current) onRejectedRef.current(clean ? 'hallucination' : 'empty');
+              if (onRejectedRef.current) onRejectedRef.current(reason);
             }
           } catch (err) {
             console.error("Whisper error:", err);
@@ -432,6 +455,7 @@ IMPORTANT: Always recommend exactly ONE stall and ONE dish. Never suggest multip
 When recommending, always mention the stall number (e.g. "Stall 5").
 ALWAYS make a recommendation — never just ask a clarifying question. Even if the request is vague (e.g. "food stores", "what do you have"), pick your top recommendation and offer it.
 For health-related requests (gastric, sore throat, flu, post-surgery), recommend light and gentle options like porridge (Stall 8), vegetarian (Stall 5), or soup (Stall 10/11). Avoid heavy or rich dishes like organ meats.
+Halal rule: pork, lard, char siew, bak kut teh, bak chor mee, pig organ, roast pork, wanton (with pork), and alcohol are never halal. If the user asks for something contradictory like "halal pork", "halal bak kut teh", or "halal char siew", politely point out that pork is not halal and suggest a genuinely halal alternative (e.g. halal chicken rice at Stall 14, beef rendang at Stall 19, ayam penyet at Stall 20). Never pretend a non-halal dish is halal.
 Be friendly, warm, and conversational. Always respond in 4-6 sentences — never fewer than 4.
 Reply in plain text only. Do not use markdown, asterisks, bold, italics, bullet points, or any formatting symbols — the text is spoken aloud.
 Here is the stall directory:\n` + BRANDS.map(b =>
