@@ -494,6 +494,9 @@ function App() {
   // when Gemini returns after D-ID finishes connecting (race condition: otherwise pendingSpeakRef is set
   // but the 'connected' event already fired with nothing to speak, leaving the UI stuck loading).
   const didConnectedRef = useRef(false);
+  // When true, the next speak() → 'START'/'speaking' video event is a silent warmup; don't flip App's
+  // `speaking` state (which would pause VAD and drop the user's in-progress recording). videoReady still flips.
+  const isWarmupRef = useRef(false);
 
   const D_ID_API_KEY = window.__CONFIG?.D_ID_API_KEY;
   const D_ID_AGENT_ID = window.__CONFIG?.D_ID_AGENT_ID;
@@ -563,10 +566,23 @@ function App() {
                       agentRef.current.speak({ type: 'text', input: 'Hello! I am Kimberly, your AI concierge here at Kopitiam. What are you in the mood for today?' }).catch(() => {});
                     }
                   }, 500);
+                } else {
+                  // User already spoke — fire a muted warmup speak so D-ID pushes video frames.
+                  // D-ID minLength is 3 chars, so we must use real text and mute the <video> element
+                  // to hide the audio. isWarmupRef prevents VAD from dropping the in-progress recording.
+                  isWarmupRef.current = true;
+                  console.log('[D-ID] firing silent warmup speak (user spoke first)');
+                  if (videoRef.current) videoRef.current.muted = true;
+                  setTimeout(() => {
+                    if (agentRef.current) {
+                      agentRef.current.speak({ type: 'text', input: 'mmm' }).catch(err => {
+                        console.error('[D-ID] warmup speak error:', err);
+                        isWarmupRef.current = false;
+                        if (videoRef.current) videoRef.current.muted = false;
+                      });
+                    }
+                  }, 100);
                 }
-                // If user is already talking when D-ID connects: don't warmup (it would flip speaking=true and kill
-                // the in-progress recording). The spinner stays visible, and the stream will start as soon as Kimberly
-                // speaks her first reply.
               }
             },
             onVideoStateChange(state) {
@@ -576,14 +592,20 @@ function App() {
                   console.log('[PERF] D-ID speak→speaking:', ms(perf.speakCall, perf.speakStart));
                   perfLogTurn();
                 }
-                setSpeaking(true); setVideoReady(true);
+                setVideoReady(true);
+                if (!isWarmupRef.current) setSpeaking(true);
               }
               if (state === 'STOP' || state === 'idle' || state === 'stopped') {
                 if (perf.speakStart && !perf.speakEnd) {
                   perf.speakEnd = performance.now();
                   console.log('[PERF] Kimberly speak duration:', ms(perf.speakStart, perf.speakEnd));
                 }
-                setSpeaking(false);
+                if (isWarmupRef.current) {
+                  isWarmupRef.current = false; // warmup done; don't touch `speaking` (was never set true)
+                  if (videoRef.current) videoRef.current.muted = false; // restore audio for real replies
+                } else {
+                  setSpeaking(false);
+                }
                 if (state === 'idle') setVideoReady(true); // idle loop means real frames are flowing
               }
             },
@@ -722,18 +744,19 @@ function App() {
     window.__test = {
       sendToAgent: (text) => sendToAgentRef.current && sendToAgentRef.current(text),
       getState: () => ({
-        loading, speaking, didConnected,
+        loading, speaking, didConnected, videoReady,
         userSpokeFirst: userSpokeFirstRef.current,
         pendingSpeak: pendingSpeakRef.current,
         messagesCount: messages.length,
         lastMessage: messages[messages.length - 1],
+        perf: { ...perf },
       }),
       markUserSpokeFirst: () => { userSpokeFirstRef.current = true; },
       // Simulates D-ID's connected event firing — flips state AND ref, like the real onConnectionStateChange
       // would. Use to reproduce the speak-first race without needing a live D-ID session.
       fakeDidConnect: () => { setDidConnected(true); didConnectedRef.current = true; },
     };
-  }, [loading, speaking, didConnected, messages]);
+  }, [loading, speaking, didConnected, videoReady, messages]);
 
   // ─── Start Screen ───
   if (!started) {
