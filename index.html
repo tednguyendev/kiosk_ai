@@ -729,6 +729,9 @@ function App() {
         lastMessage: messages[messages.length - 1],
       }),
       markUserSpokeFirst: () => { userSpokeFirstRef.current = true; },
+      // Simulates D-ID's connected event firing — flips state AND ref, like the real onConnectionStateChange
+      // would. Use to reproduce the speak-first race without needing a live D-ID session.
+      fakeDidConnect: () => { setDidConnected(true); didConnectedRef.current = true; },
     };
   }, [loading, speaking, didConnected, messages]);
 
