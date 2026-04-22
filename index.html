@@ -7,9 +7,9 @@
 <script>
 window.__CONFIG = {
   D_ID_API_KEY: 'aW12bXMyMDVAZ21haWwuY29t:mxgYbhVrC7OAYz1nzj561',
-  D_ID_AGENT_ID: 'v2_agt_LJ2exBPU',
+  D_ID_AGENT_ID: 'v2_agt_ebm4EzLk',
   GEMINI_API_KEY: 'AIzaSyAHCe88d2e8jrApLX9KKyaKEyU-ZJx9a54',
-  GEMINI_MODEL: 'gemini-3-flash-preview',
+  GEMINI_MODEL: 'gemini-2.5-flash',
   OPENAI_API_KEY: 'YOUR_OPENAI_API_KEY'
 };
 </script>
@@ -114,15 +114,41 @@ function filterMessage(text) {
   return { allowed: true };
 }
 
-// ─── Whisper Speech Recognition Hook (tap-to-talk) ───
+// ─── Perf timing (pipeline benchmarking) ───
+// Each turn populates these timestamps so we can print a breakdown.
+const perf = { speechStart: 0, silenceAt: 0, whisperStart: 0, whisperEnd: 0, geminiStart: 0, geminiEnd: 0, speakCall: 0, speakStart: 0, speakEnd: 0 };
+const ms = (a, b) => (b - a).toFixed(0) + 'ms';
+function perfReset() {
+  Object.keys(perf).forEach(k => perf[k] = 0);
+}
+function perfLogTurn() {
+  const { speechStart, silenceAt, whisperStart, whisperEnd, geminiStart, geminiEnd, speakCall, speakStart } = perf;
+  const rows = [];
+  if (speechStart && silenceAt) rows.push(['User speech duration', ms(speechStart, silenceAt)]);
+  if (silenceAt && whisperStart) rows.push(['Silence→Whisper start', ms(silenceAt, whisperStart)]);
+  if (whisperStart && whisperEnd) rows.push(['Whisper transcription', ms(whisperStart, whisperEnd)]);
+  if (whisperEnd && geminiStart) rows.push(['Whisper→Gemini start', ms(whisperEnd, geminiStart)]);
+  if (geminiStart && geminiEnd) rows.push(['Gemini reply', ms(geminiStart, geminiEnd)]);
+  if (geminiEnd && speakCall) rows.push(['Gemini→speak() call', ms(geminiEnd, speakCall)]);
+  if (speakCall && speakStart) rows.push(['D-ID speak→audio start', ms(speakCall, speakStart)]);
+  if (silenceAt && speakStart) rows.push(['TOTAL: silence→Kimberly speaks', ms(silenceAt, speakStart)]);
+  console.log('%c[PERF] Turn breakdown', 'font-weight:bold;color:#CF463A');
+  console.table(rows);
+}
+
+// ─── Whisper + VAD (always-listening) ───
 
 async function transcribeAudio(audioBlob) {
   const OPENAI_API_KEY = window.__CONFIG.OPENAI_API_KEY;
   const formData = new FormData();
   formData.append('file', audioBlob, 'audio.webm');
   formData.append('model', 'whisper-1');
+  formData.append('language', 'en');      // lock to English — prevents JP/other hallucination
+  formData.append('temperature', '0');    // deterministic, reduces invented text
+  formData.append('prompt', 'Food court customer asking about stalls, dishes, halal options.');
 
   console.log('[Whisper] sending blob, size:', audioBlob.size, 'type:', audioBlob.type);
+  perf.whisperStart = performance.now();
   const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}` },
@@ -130,6 +156,8 @@ async function transcribeAudio(audioBlob) {
   });
 
   const raw = await res.text();
+  perf.whisperEnd = performance.now();
+  console.log('[PERF] Whisper:', ms(perf.whisperStart, perf.whisperEnd));
   console.log('[Whisper] status:', res.status, 'body:', raw);
   if (!res.ok) throw new Error(`Whisper ${res.status}: ${raw}`);
   let data;
@@ -137,75 +165,231 @@ async function transcribeAudio(audioBlob) {
   return (data.text || '').trim();
 }
 
-function useSpeechRecognition() {
-  const [isListening, setIsListening] = useState(false);
-  const [transcript, setTranscript] = useState("");
+// Known Whisper hallucinations. Substring match (normalized) — Whisper often concatenates these into longer sentences.
+const WHISPER_HALLUCINATION_SUBSTRINGS = [
+  'thanks for watching', 'thank you for watching',
+  'subscribe to the channel', 'please subscribe', 'like and subscribe',
+  'dont forget to like', 'dont forget to subscribe',
+  'see you next time', 'see you in the next video',
+  'hit the bell', 'ring the bell',
+];
+const WHISPER_HALLUCINATION_EXACT = [
+  'you', 'thank you', 'thanks', 'bye', 'okay', 'ok',
+  '.', '...', 'music', '[music]', '(music)', 'applause', '[applause]',
+];
+function isHallucination(text) {
+  if (!text) return true;
+  const norm = text.toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (norm.length < 2) return true;
+  if (WHISPER_HALLUCINATION_EXACT.includes(norm)) return true;
+  if (WHISPER_HALLUCINATION_SUBSTRINGS.some(sub => norm.includes(sub))) return true;
+  // Any non-ASCII response when we asked for English = hallucination
+  if (/[^\x00-\x7F]/.test(text)) return true;
+  return false;
+}
+
+// VAD tuning
+const VAD_SPEECH_THRESHOLD = 0.02;    // RMS above this = speaking (lower = catches quieter speakers)
+const VAD_SILENCE_MS = 2000;          // silence duration that ends an utterance
+const VAD_MIN_SPEECH_MS = 500;        // ignore blips shorter than this
+const VAD_MIN_LOUD_FRAMES = 8;        // need at least N loud samples total before committing
+
+function useVoiceActivity({ enabled, paused, onUtterance, onRejected }) {
+  const [isListening, setIsListening] = useState(false); // has mic permission / stream running
+  const [isSpeaking, setIsSpeaking] = useState(false);   // currently detecting voice
+  const [isTranscribing, setIsTranscribing] = useState(false); // VAD committed, Whisper running
   const [supported, setSupported] = useState(true);
-  const mediaRecorderRef = useRef(null);
+  const onRejectedRef = useRef(onRejected);
+  useEffect(() => { onRejectedRef.current = onRejected; }, [onRejected]);
+
+  const streamRef = useRef(null);
+  const audioCtxRef = useRef(null);
+  const analyserRef = useRef(null);
+  const rafRef = useRef(null);
+  const recorderRef = useRef(null);
   const chunksRef = useRef([]);
-  const onEndCallbackRef = useRef(null);
+  const speakingRef = useRef(false);
+  const speechStartRef = useRef(0);
+  const lastVoiceAtRef = useRef(0);
+  const loudFramesRef = useRef(0);
+  const pausedRef = useRef(paused);
+  const committedRef = useRef(false); // frozen after an utterance is sent, until Kimberly finishes
+  const prevPausedRef = useRef(paused);
+  const onUtteranceRef = useRef(onUtterance);
+
+  useEffect(() => { pausedRef.current = paused; }, [paused]);
+  useEffect(() => { onUtteranceRef.current = onUtterance; }, [onUtterance]);
+
+  // When the parent stops being busy (Kimberly done speaking + not loading), thaw the mic
+  useEffect(() => {
+    if (prevPausedRef.current && !paused) {
+      committedRef.current = false;
+      console.log('[VAD] thaw — ready to listen');
+    }
+    prevPausedRef.current = paused;
+  }, [paused]);
+
+  // If paused mid-utterance, drop in-progress recording so avatar's voice isn't captured
+  useEffect(() => {
+    if (paused && speakingRef.current) {
+      speakingRef.current = false;
+      setIsSpeaking(false);
+      if (recorderRef.current && recorderRef.current.state === 'recording') {
+        recorderRef.current._discard = true;
+        try { recorderRef.current.stop(); } catch (e) {}
+      }
+    }
+  }, [paused]);
 
   useEffect(() => {
+    if (!enabled) return;
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       setSupported(false);
+      return;
     }
-  }, []);
+    let cancelled = false;
 
-  const startListening = useCallback(async () => {
-    if (isListening) return;
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
-      chunksRef.current = [];
+    async function start() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+        });
+        if (cancelled) { stream.getTracks().forEach(t => t.stop()); return; }
+        streamRef.current = stream;
 
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunksRef.current.push(e.data);
-      };
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        const ctx = new AudioCtx();
+        audioCtxRef.current = ctx;
+        const source = ctx.createMediaStreamSource(stream);
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 1024;
+        source.connect(analyser);
+        analyserRef.current = analyser;
 
-      mediaRecorder.onstop = async () => {
-        stream.getTracks().forEach(t => t.stop());
-        const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
-        console.log('Recording stopped, blob size:', blob.size, 'chunks:', chunksRef.current.length);
-        const cb = onEndCallbackRef.current;
-        onEndCallbackRef.current = null;
+        const data = new Uint8Array(analyser.fftSize);
+        setIsListening(true);
 
-        if (blob.size > 0) {
+        const tick = () => {
+          rafRef.current = requestAnimationFrame(tick);
+          if (pausedRef.current || committedRef.current) return;
+
+          analyser.getByteTimeDomainData(data);
+          let sum = 0;
+          for (let i = 0; i < data.length; i++) {
+            const v = (data[i] - 128) / 128;
+            sum += v * v;
+          }
+          const rms = Math.sqrt(sum / data.length);
+          const now = performance.now();
+
+          if (rms > VAD_SPEECH_THRESHOLD) {
+            lastVoiceAtRef.current = now;
+            loudFramesRef.current += 1;
+            if (!speakingRef.current) {
+              speakingRef.current = true;
+              speechStartRef.current = now;
+              setIsSpeaking(true);
+              perfReset();
+              perf.speechStart = performance.now();
+              console.log('[PERF] speech start');
+              startRecording();
+            }
+          } else if (speakingRef.current) {
+            const silentFor = now - lastVoiceAtRef.current;
+            const spokeFor = now - speechStartRef.current;
+            if (silentFor > VAD_SILENCE_MS) {
+              speakingRef.current = false;
+              setIsSpeaking(false);
+              const keep = spokeFor >= VAD_MIN_SPEECH_MS
+                        && loudFramesRef.current >= VAD_MIN_LOUD_FRAMES;
+              if (keep) {
+                committedRef.current = true; // freeze mic until Kimberly replies
+                perf.silenceAt = performance.now() - VAD_SILENCE_MS; // when user actually stopped
+                console.log('[PERF] silence detected — committing, loudFrames:', loudFramesRef.current, 'spokeFor:', spokeFor.toFixed(0) + 'ms');
+              } else {
+                console.log('[VAD] discarded — too short/quiet, loudFrames:', loudFramesRef.current, 'spokeFor:', spokeFor);
+              }
+              loudFramesRef.current = 0;
+              stopRecording(keep);
+            }
+          }
+        };
+        tick();
+      } catch (err) {
+        console.error("Mic access error:", err);
+        setSupported(false);
+      }
+    }
+
+    function startRecording() {
+      if (!streamRef.current) return;
+      if (recorderRef.current && recorderRef.current.state === 'recording') return;
+      try {
+        const rec = new MediaRecorder(streamRef.current, { mimeType: 'audio/webm' });
+        chunksRef.current = [];
+        rec.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+        rec.onstop = async () => {
+          const discard = rec._discard === true;
+          const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
+          chunksRef.current = [];
+          if (discard || blob.size === 0) {
+            console.log('[VAD] discarded utterance');
+            committedRef.current = false;
+            setIsTranscribing(false);
+            return;
+          }
+          setIsTranscribing(true);
           try {
-            setTranscript("Transcribing...");
             const text = await transcribeAudio(blob);
-            console.log('Whisper result:', text);
-            setTranscript(text);
-            setIsListening(false);
-            if (cb && text.trim()) cb(text.trim());
+            const clean = (text || '').trim();
+            console.log('[VAD] Whisper:', JSON.stringify(clean));
+            if (clean && !isHallucination(clean) && onUtteranceRef.current) {
+              onUtteranceRef.current(clean);
+            } else {
+              console.log('[VAD] rejected (empty or hallucination):', JSON.stringify(clean));
+              committedRef.current = false;
+              if (onRejectedRef.current) onRejectedRef.current(clean ? 'hallucination' : 'empty');
+            }
           } catch (err) {
             console.error("Whisper error:", err);
-            setTranscript("");
-            setIsListening(false);
+            committedRef.current = false;
+            if (onRejectedRef.current) onRejectedRef.current('error');
+          } finally {
+            setIsTranscribing(false);
           }
-        } else {
-          console.log('Empty blob, skipping');
-          setIsListening(false);
-        }
-      };
-
-      mediaRecorderRef.current = mediaRecorder;
-      mediaRecorder.start();
-      setTranscript("");
-      setIsListening(true);
-    } catch (err) {
-      console.error("Mic access error:", err);
-      setSupported(false);
+        };
+        recorderRef.current = rec;
+        rec.start();
+      } catch (e) {
+        console.error('Recorder start error', e);
+      }
     }
-  }, [isListening]);
 
-  const stopListening = useCallback((onEnd) => {
-    if (mediaRecorderRef.current && isListening) {
-      onEndCallbackRef.current = onEnd;
-      mediaRecorderRef.current.stop();
+    function stopRecording(keep) {
+      const rec = recorderRef.current;
+      if (!rec || rec.state !== 'recording') return;
+      rec._discard = !keep;
+      try { rec.stop(); } catch (e) {}
     }
-  }, [isListening]);
 
-  return { isListening, transcript, supported, startListening, stopListening };
+    start();
+
+    return () => {
+      cancelled = true;
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      if (recorderRef.current && recorderRef.current.state === 'recording') {
+        recorderRef.current._discard = true;
+        try { recorderRef.current.stop(); } catch (e) {}
+      }
+      if (audioCtxRef.current) { try { audioCtxRef.current.close(); } catch (e) {} }
+      if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
+      setIsListening(false);
+      setIsSpeaking(false);
+    };
+  }, [enabled]);
+
+  return { isListening, isSpeaking, isTranscribing, supported };
 }
 
 // ─── Nav Button Component ───
@@ -289,13 +473,13 @@ function App() {
   const [didStatus, setDidStatus] = useState("Initializing...");
   const [filtered, setFiltered] = useState(false);
   const [recommendations, setRecommendations] = useState([]);
+  const [rejectionNote, setRejectionNote] = useState(null);
   const videoRef = useRef(null);
   const agentRef = useRef(null);
   const chatEndRef = useRef(null);
   const userSpokeFirstRef = useRef(false);
   const greetingTimeoutRef = useRef(null);
   const pendingSpeakRef = useRef(null);
-  const { isListening, transcript, supported, startListening, stopListening } = useSpeechRecognition();
 
   const D_ID_API_KEY = window.__CONFIG?.D_ID_API_KEY;
   const D_ID_AGENT_ID = window.__CONFIG?.D_ID_AGENT_ID;
@@ -346,30 +530,46 @@ function App() {
                 if (videoRef.current && videoRef.current.srcObject) {
                   videoRef.current.play().catch(() => {});
                 }
-                // If user already spoke, speak their queued response instead of greeting
+                // Warm up the idle stream immediately so the avatar circle isn't blank.
+                // D-ID only pushes video frames after the first speak() call.
                 if (pendingSpeakRef.current) {
                   const text = pendingSpeakRef.current;
                   pendingSpeakRef.current = null;
                   setTimeout(() => {
-                    if (agentRef.current) agentRef.current.speak({ type: 'text', input: text }).catch(() => {});
+                    if (agentRef.current) {
+                      perf.speakCall = performance.now();
+                      agentRef.current.speak({ type: 'text', input: text }).catch(() => {});
+                    }
+                    setLoading(false); // pending reply is now being spoken
                   }, 500);
                 } else if (!userSpokeFirstRef.current) {
-                  // Only greet if user hasn't started talking
                   greetingTimeoutRef.current = setTimeout(() => {
                     if (agentRef.current && !userSpokeFirstRef.current) {
                       agentRef.current.speak({ type: 'text', input: 'Hello! I am Kimberly, your AI concierge here at Kopitiam. What are you in the mood for today?' }).catch(() => {});
                     }
                   }, 500);
                 }
-                setTimeout(() => { setVideoReady(true); }, 4000);
+                // If user is already talking when D-ID connects: don't warmup (it would flip speaking=true and kill
+                // the in-progress recording). The spinner stays visible, and the stream will start as soon as Kimberly
+                // speaks her first reply.
               }
             },
             onVideoStateChange(state) {
               if (state === 'START' || state === 'speaking') {
+                if (!perf.speakStart && perf.speakCall) {
+                  perf.speakStart = performance.now();
+                  console.log('[PERF] D-ID speak→speaking:', ms(perf.speakCall, perf.speakStart));
+                  perfLogTurn();
+                }
                 setSpeaking(true); setVideoReady(true);
               }
               if (state === 'STOP' || state === 'idle' || state === 'stopped') {
+                if (perf.speakStart && !perf.speakEnd) {
+                  perf.speakEnd = performance.now();
+                  console.log('[PERF] Kimberly speak duration:', ms(perf.speakStart, perf.speakEnd));
+                }
                 setSpeaking(false);
+                if (state === 'idle') setVideoReady(true); // idle loop means real frames are flowing
               }
             },
             onNewMessage(msgs, type) {
@@ -408,7 +608,51 @@ function App() {
     };
   }, [started]);
 
-  const micDisabled = speaking || loading;
+  const sendToAgentRef = useRef(null);
+
+  const handleUtterance = useCallback((text) => {
+    userSpokeFirstRef.current = true;
+    if (greetingTimeoutRef.current) {
+      clearTimeout(greetingTimeoutRef.current);
+      greetingTimeoutRef.current = null;
+    }
+    if (sendToAgentRef.current) sendToAgentRef.current(text);
+  }, []);
+
+  const handleRejected = useCallback((reason) => {
+    const msg = reason === 'error' ? "Couldn't reach Whisper — try again?"
+              : reason === 'empty' ? "Didn't catch that — try again?"
+              : "Hmm, didn't catch that — try again?";
+    setRejectionNote(msg);
+    setTimeout(() => setRejectionNote(null), 3500);
+  }, []);
+
+  const { isListening, isSpeaking: userSpeaking, isTranscribing, supported } = useVoiceActivity({
+    enabled: started,
+    paused: speaking || loading,
+    onUtterance: handleUtterance,
+    onRejected: handleRejected,
+  });
+
+  // The moment VAD hears the user talking, cancel any pending/active greeting.
+  // This runs immediately (not after Whisper), so the AI won't start its first greeting on top of the user.
+  useEffect(() => {
+    if (!userSpeaking) return;
+    userSpokeFirstRef.current = true;
+    if (greetingTimeoutRef.current) {
+      clearTimeout(greetingTimeoutRef.current);
+      greetingTimeoutRef.current = null;
+    }
+    // If D-ID already started the greeting, try to stop it (only when it's the greeting, not a real reply)
+    if (messages.length === 0 && agentRef.current && speaking) {
+      const a = agentRef.current;
+      try {
+        if (typeof a.interrupt === 'function') a.interrupt();
+        else if (typeof a.stopSpeaking === 'function') a.stopSpeaking();
+        else if (typeof a.stop === 'function') a.stop();
+      } catch (e) { console.log('interrupt failed', e); }
+    }
+  }, [userSpeaking, speaking, messages.length]);
 
   async function sendToAgent(text) {
     if (!text.trim()) return;
@@ -426,17 +670,21 @@ function App() {
     try {
       // Build conversation history for Gemini
       const history = [...messages, userMsg].filter(m => !m.filtered);
+      perf.geminiStart = performance.now();
       const reply = await callGemini(history);
+      perf.geminiEnd = performance.now();
+      console.log('[PERF] Gemini:', ms(perf.geminiStart, perf.geminiEnd));
       const assistantMsg = { role: 'assistant', content: reply };
       setMessages(prev => [...prev, assistantMsg]);
       setRecommendations(extractRecommendations(reply));
-      setLoading(false);
-      // Make avatar speak the response (or queue if D-ID not ready)
       if (agentRef.current && didConnected) {
+        setLoading(false);
+        perf.speakCall = performance.now();
         agentRef.current.speak({ type: 'text', input: reply }).catch(err => {
           console.error("speak error:", err);
         });
       } else {
+        console.log('[App] reply queued — waiting for D-ID to connect');
         pendingSpeakRef.current = reply;
       }
     } catch (err) {
@@ -446,27 +694,7 @@ function App() {
     }
   }
 
-  const pendingTranscriptRef = useRef(null);
-
-  function handleMicClick() {
-    if (micDisabled) return;
-    if (isListening) {
-      console.log('Stopping recording...');
-      stopListening((text) => {
-        console.log('stopListening callback, text:', text);
-        sendToAgent(text);
-      });
-    } else {
-      console.log('Starting recording...');
-      // Cancel AI greeting if user talks first
-      userSpokeFirstRef.current = true;
-      if (greetingTimeoutRef.current) {
-        clearTimeout(greetingTimeoutRef.current);
-        greetingTimeoutRef.current = null;
-      }
-      startListening();
-    }
-  }
+  useEffect(() => { sendToAgentRef.current = sendToAgent; });
 
   // ─── Start Screen ───
   if (!started) {
@@ -531,8 +759,8 @@ function App() {
 
       {/* ── Kimberly Avatar (D-ID video, right side) ── */}
       <div style={{
-        position: "absolute", width: 700, height: 700,
-        left: 1380, top: 500, overflow: "hidden",
+        position: "absolute", width: 900, height: 900,
+        left: 1200, top: 440, overflow: "hidden",
         borderRadius: "50%",
         border: `6px solid ${GOLD}`,
         boxShadow: speaking ? `0 0 60px rgba(245,177,80,0.4)` : "0 8px 40px rgba(0,0,0,0.15)",
@@ -540,22 +768,32 @@ function App() {
       }}>
         <video ref={videoRef} autoPlay playsInline
           onLoadedMetadata={() => { if (videoRef.current) videoRef.current.play().catch(() => {}); }}
-          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+          style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center top" }}
         />
         {!videoReady && (
           <div style={{
             position: "absolute", inset: 0, display: "flex", flexDirection: "column",
-            alignItems: "center", justifyContent: "center", background: "rgba(232,232,232,0.5)",
+            alignItems: "center", justifyContent: "center",
+            background: "linear-gradient(180deg, #f4e6d0 0%, #e8d4b0 100%)",
           }}>
-            <div style={{ width: 60, height: 60, border: "4px solid #ddd", borderTopColor: RED, borderRadius: "50%", animation: "spin 1s linear infinite" }} />
-            <span style={{ color: "#888", fontSize: 32, marginTop: 20 }}>{didConnected ? "Loading avatar..." : didStatus}</span>
+            {/* Stylized silhouette placeholder so the circle never looks empty */}
+            <svg width="320" height="320" viewBox="0 0 200 200" style={{ opacity: 0.35 }}>
+              <circle cx="100" cy="75" r="38" fill={RED} />
+              <path d="M 30 200 Q 30 115 100 115 Q 170 115 170 200 Z" fill={RED} />
+            </svg>
+            <div style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 24 }}>
+              <div style={{ width: 32, height: 32, border: "3px solid rgba(207,70,58,0.25)", borderTopColor: RED, borderRadius: "50%", animation: "spin 1s linear infinite" }} />
+              <span style={{ color: "#7a5a3a", fontSize: 30, fontWeight: 500 }}>
+                {didConnected ? "Kimberly is getting ready..." : didStatus}
+              </span>
+            </div>
           </div>
         )}
       </div>
 
       {/* ── Chat Area (text message style) ── */}
       <div style={{
-        position: "absolute", left: 400, top: 500, width: 900, height: 1150,
+        position: "absolute", left: 400, top: 500, width: 750, height: 1150,
         display: "flex", flexDirection: "column",
         background: "transparent", borderRadius: 30,
         padding: 20,
@@ -565,7 +803,7 @@ function App() {
           display: "flex", flexDirection: "column", gap: 24,
         }}>
           {/* Initial greeting */}
-          {messages.length === 0 && !loading && !isListening && (
+          {messages.length === 0 && !loading && !userSpeaking && !isTranscribing && (
             <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
               <div style={{ fontWeight: 600, fontSize: 30, color: RED, marginBottom: 8, marginLeft: 8 }}>Kimberly</div>
               <div style={{
@@ -610,7 +848,7 @@ function App() {
           ))}
 
           {/* Listening indicator */}
-          {isListening && (
+          {userSpeaking && (
             <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
               <div style={{ fontWeight: 600, fontSize: 30, color: "#555", marginBottom: 8, marginRight: 8 }}>You</div>
               <div style={{
@@ -620,7 +858,23 @@ function App() {
                 fontSize: 32, lineHeight: "42px", color: RED,
                 border: `2px dashed ${RED}`,
               }}>
-                {transcript || "Listening..."}
+                Listening...
+              </div>
+            </div>
+          )}
+
+          {/* Transcribing indicator — bridges the gap between VAD cutoff and user bubble appearing */}
+          {isTranscribing && !userSpeaking && (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+              <div style={{ fontWeight: 600, fontSize: 30, color: "#555", marginBottom: 8, marginRight: 8 }}>You</div>
+              <div style={{
+                background: "rgba(207,70,58,0.08)",
+                borderRadius: "20px 20px 4px 20px",
+                padding: "24px 32px",
+                fontSize: 32, lineHeight: "42px", color: "#888",
+                border: `2px dashed #bbb`,
+              }}>
+                <span style={{ animation: "pulse 1.5s infinite" }}>Transcribing...</span>
               </div>
             </div>
           )}
@@ -635,7 +889,24 @@ function App() {
                 padding: "24px 32px",
                 fontSize: 32, lineHeight: "42px", color: "#666",
               }}>
-                <span style={{ animation: "pulse 1.5s infinite" }}>Thinking...</span>
+                <span style={{ animation: "pulse 1.5s infinite" }}>
+                  {didConnected ? "Thinking..." : "Thinking... (connecting avatar)"}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Transient rejection toast — shown when Whisper returns nothing useful */}
+          {rejectionNote && !loading && !userSpeaking && !isTranscribing && (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+              <div style={{
+                background: "rgba(207,70,58,0.08)",
+                borderRadius: 30,
+                padding: "16px 28px",
+                fontSize: 28, color: "#888",
+                border: `2px solid rgba(207,70,58,0.2)`,
+              }}>
+                {rejectionNote}
               </div>
             </div>
           )}
@@ -644,38 +915,38 @@ function App() {
         </div>
       </div>
 
-      {/* ── Speak Button ── */}
+      {/* ── Voice status indicator ── */}
       <div style={{
-        position: "absolute", left: "50%", top: 1753,
+        position: "absolute", left: "50%", top: 1830,
         transform: "translateX(-50%)",
-        display: "flex", flexDirection: "column", alignItems: "center",
+        display: "flex", flexDirection: "column", alignItems: "center", gap: 16,
       }}>
-        <button onClick={handleMicClick} style={{
-          width: 281, height: 277, borderRadius: "50%",
-          background: micDisabled ? "#999" : RED,
-          border: `10px solid ${micDisabled ? "#bbb" : GOLD}`,
-          boxShadow: isListening
-            ? "0 0 0 0 rgba(207,70,58,0.5)"
-            : "0px 4px 4px rgba(0, 0, 0, 0.25)",
-          color: WHITE,
-          cursor: micDisabled ? "not-allowed" : "pointer",
-          opacity: micDisabled ? 0.4 : 1,
-          display: "flex", alignItems: "center", justifyContent: "center",
+        <div style={{
+          display: "flex", alignItems: "center", gap: 20,
+          padding: "24px 48px", borderRadius: 60,
+          background: WHITE,
+          border: `4px solid ${userSpeaking ? RED : (speaking || loading) ? "#ccc" : GOLD}`,
+          boxShadow: "0 4px 20px rgba(0,0,0,0.08)",
           transition: "all 0.3s",
-          animation: isListening ? "micPulse 1.5s infinite" : "none",
         }}>
-          <svg width="127" height="123" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-            <line x1="12" y1="19" x2="12" y2="23"/>
-            <line x1="8" y1="23" x2="16" y2="23"/>
-          </svg>
-        </button>
+          <div style={{
+            width: 28, height: 28, borderRadius: "50%",
+            background: userSpeaking ? RED : (speaking || loading) ? "#ccc" : "#4CAF50",
+            animation: userSpeaking ? "pulse 1s infinite" : "none",
+          }} />
+          <span style={{
+            fontSize: 36, fontWeight: 600,
+            color: userSpeaking ? RED : (speaking || loading) ? "#888" : DARK_TEXT,
+          }}>
+            {!isListening ? "Starting mic…"
+              : speaking ? "Kimberly is speaking…"
+              : loading ? "Thinking…"
+              : userSpeaking ? "Listening…"
+              : "Just speak — I'm listening"}
+          </span>
+        </div>
         {!didConnected && (
-          <div style={{ color: "#888", fontSize: 28, marginTop: 20 }}>{didStatus}</div>
-        )}
-        {isListening && (
-          <div style={{ color: RED, fontSize: 32, fontWeight: 600, marginTop: 20 }}>Listening...</div>
+          <div style={{ color: "#888", fontSize: 28 }}>{didStatus}</div>
         )}
       </div>
 
