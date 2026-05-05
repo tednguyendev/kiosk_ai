@@ -1,0 +1,1146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=2160, initial-scale=1.0">
+<title>Ask Kimberly - Chat with me</title>
+<script>
+window.__CONFIG = {
+  LIVEAVATAR_API_KEY: 'e18a9de2-4852-11f1-8d28-066a7fa2e369',
+  LIVEAVATAR_AVATAR_ID: '513fd1b7-7ef9-466d-9af2-344e51eeb833', // Ann Therapist
+  LIVEAVATAR_VOICE_ID: 'de5574fc-009e-4a01-a881-9919ef8f5a0c', // Ann - IA
+  GEMINI_API_KEY: 'AIzaSyAHCe88d2e8jrApLX9KKyaKEyU-ZJx9a54',
+  GEMINI_MODEL: 'gemini-2.5-flash',
+  OPENAI_API_KEY: 'YOUR_OPENAI_API_KEY'
+};
+</script>
+<script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<!-- LiveKit SDK for WebRTC -->
+<script src="https://cdn.jsdelivr.net/npm/livekit-client@2.6.2/dist/livekit-client.umd.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #000;
+  overflow: hidden;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#root {
+  width: 2160px;
+  height: 3840px;
+  transform-origin: top left;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+@keyframes pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
+@keyframes ripple {
+  0% { transform: scale(0.85); opacity: 0.6; }
+  100% { transform: scale(1.5); opacity: 0; }
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes micPulse {
+  0% { box-shadow: 0 0 0 0 rgba(207,70,58,0.5); }
+  70% { box-shadow: 0 0 0 40px rgba(207,70,58,0); }
+  100% { box-shadow: 0 0 0 0 rgba(207,70,58,0); }
+}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+function scaleKiosk() {
+  var root = document.getElementById('root');
+  var scaleX = window.innerWidth / 2160;
+  var scaleY = window.innerHeight / 3840;
+  var scale = Math.min(scaleX, scaleY);
+  root.style.transform = 'scale(' + scale + ')';
+  root.style.left = ((window.innerWidth - 2160 * scale) / 2) + 'px';
+  root.style.top = ((window.innerHeight - 3840 * scale) / 2) + 'px';
+}
+scaleKiosk();
+window.addEventListener('resize', scaleKiosk);
+</script>
+<script type="text/babel">
+const { useState, useRef, useEffect, useCallback } = React;
+
+const RED = "#CF463A";
+const GOLD = "#F5B150";
+const DARK_TEXT = "#324157";
+const WHITE = "#FFFFFF";
+
+// ─── Restaurant Data ───
+
+const MALL_NAME = "Kopitiam Food Court at Tan Tock Seng Hospital";
+const BRANDS = [
+  { stall: 1, brand: "Kopi Kiosk", cuisine: "Drinks & Desserts", halal: false, signature: "Kopitiam Signature Breakfast Set", desc: "Traditional kopi/teh, Yakult Juices, Ice Spin series, Super Saver Bao set. Breakfast set $3 (union member before 11am)." },
+  { stall: 1, brand: "Ann Chin Popiah", cuisine: "Popiah (Michelin Guide)", halal: false, signature: "Popiah", desc: "Founded 1958. Famous for thin, fragrant, chewy popiah skin. Heritage recipe." },
+  { stall: 2, brand: "Bread Junction", cuisine: "Bread & Bakery", halal: true, signature: "Fresh Bread", desc: "Muslim-friendly bakery with fresh bread and pastries." },
+  { stall: 3, brand: "Kallang Airport Wanton Mee", cuisine: "Wanton Noodle", halal: false, signature: "Wanton Noodle", desc: "Recipe from hawker selling since 1960. Delicious Char Siew, piquant chilli sauce, crispy pork lard, hand-wrapped wantons." },
+  { stall: 4, brand: "Teochew Pig Organ Soup & Braised", cuisine: "Teochew Cuisine", halal: false, signature: "Salted Vegetable Pig's Organ Soup", desc: "Authentic Teochew flavours. Must-tries: Pig's Organ Soup, Teochew noodles, Chaoshan braised meat." },
+  { stall: 5, brand: "Yuan Wei Su Yu", cuisine: "Vegetarian", halal: false, signature: "Vegetarian Set Meal", desc: "Healthy plant-based eating. Low Oil, Low Salt, No MSG, fresh ingredients." },
+  { stall: 6, brand: "Ying Jia Steamed Fish", cuisine: "Steamed Fish", halal: false, signature: "HK Steamed Seabass", desc: "Recipe from hotel chef (20 years). Known for signature garlic sauce. Also: Cai Pu Steamed Seabass, Bean Sauce Seabass." },
+  { stall: 7, brand: "Xiang Chi Mian", cuisine: "Bak Chor Mee", halal: false, signature: "Bak Chor Mee", desc: "Authentic Singapore hawker Bak Chor Mee. Sambal chilli, black vinegar, crispy pork lard. Pork slices, liver, meatball, minced meat, braised shiitake." },
+  { stall: 8, brand: "He Jia Econ Rice & Porridge", cuisine: "Economical Rice", halal: false, signature: "Sweet and Sour Chicken", desc: "Established 2011. Over 10 dishes daily. Also: Spicy Sambal Prawns, Braised Tofu." },
+  { stall: 9, brand: "Yuan Wei Thai Cuisine", cuisine: "Thai", halal: false, signature: "Tom Yum Soup", desc: "Prepared by experienced Thai chefs. Also: stir-fried rice noodles, basil minced pork." },
+  { stall: 10, brand: "Bu Tang Wang Pepper Soup", cuisine: "Pepper Soup", halal: false, signature: "White Pepper Chicken Soup", desc: "Hearty pepper soups. Also: ABC Soup, Lotus Root Soup, Fish Maw Chicken, Black Chicken Soup." },
+  { stall: 11, brand: "King Grouper Fish Soup", cuisine: "Fish Soup", halal: false, signature: "Teochew Style Grouper", desc: "Own fish farm in Changi. Giant Grouper 12kg+, high collagen. SFA Farm-To-Table recognition. Also: Red Grouper Fish Soup, Seafood Soup." },
+  { stall: 12, brand: "Chinatown HK Roast", cuisine: "HK Roast Meat", halal: false, signature: "Famous 3 Roast Set Meal", desc: "Char Siew, Roast Duck, Roast Pork. Also: Duck rice, Wanton Noodles, Braised Chicken Feet." },
+  { stall: 13, brand: "Kakak Handmade Noodles", cuisine: "Ban Mian", halal: true, signature: "Handmade Ban Mian", desc: "Muslim-friendly handmade noodles." },
+  { stall: 14, brand: "Cinta Hainanese Chicken Rice", cuisine: "Chicken Rice", halal: true, signature: "Hainanese Chicken Rice", desc: "Muslim-friendly Hainanese chicken rice." },
+  { stall: 15, brand: "Monster Chili Mala Hot Pot", cuisine: "Mala Hotpot", halal: true, signature: "Mala Hot Pot", desc: "Singapore's first halal Mala hotpot (est. 2014). Own secret Mala Paste. Customizable spice levels. Also: Mala Soup, Malatang, Mala Noodle." },
+  { stall: 16, brand: "Beradik Western", cuisine: "Western Food", halal: true, signature: "Fish & Chips", desc: "Muslim-friendly Western food. Also: Grilled Beef Steak, Mixed Grill, Aglio Olio, Lamb Chop, Spring Chicken." },
+  { stall: 17, brand: "Pak Lum Local Delights", cuisine: "Local Hawker", halal: true, signature: "Char Kway Teow", desc: "Smoky CKT, crispy Oyster Omelette, charred Carrot Cake. Wok hei perfection. Also: Hokkien Mee, Mee Goreng." },
+  { stall: 18, brand: "Kim Dae Bak Korean & Japanese", cuisine: "Korean & Japanese", halal: true, signature: "Saba Fish", desc: "Head chef from Ju Shin Jung (10 years). Also: Korean Army Stew, Beef Bulgogi, Kimchi Jjigae, Bibimbap." },
+  { stall: 19, brand: "Majulah Nasi Padang", cuisine: "Nasi Padang", halal: true, signature: "Nasi Lemak Beef Rendang", desc: "Muslim-friendly Nasi Padang. Also: Ayam Goreng, Ayam Masak Merah, Nasi Kuning." },
+  { stall: 20, brand: "Y&H Ayam Penyet", cuisine: "Indonesian", halal: true, signature: "Ayam Penyet", desc: "Indonesian smashed fried chicken. Also: Ikan Penyet, Ayam Bakar, Lontong, Mee Soto, Grilled Seafood Set." },
+  { stall: 21, brand: "Ampang YTF & Tangkak Beef Noodle", cuisine: "Yong Tau Foo & Beef Noodle", halal: true, signature: "Ampang Yong Tau Foo", desc: "15-year family recipe. Secret soup base and ampang sauce. Each piece carefully crafted." },
+];
+
+// ─── Topic filter ───
+
+function filterMessage(text) {
+  return { allowed: true };
+}
+
+// ─── UUID polyfill for older browsers ───
+if (typeof crypto === 'undefined' || !crypto.randomUUID) {
+  crypto = crypto || {};
+  crypto.randomUUID = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0;
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+  });
+}
+
+// ─── Perf timing ───
+const perf = { speechStart: 0, silenceAt: 0, whisperStart: 0, whisperEnd: 0, geminiStart: 0, geminiEnd: 0, speakCall: 0, speakStart: 0, speakEnd: 0 };
+const ms = (a, b) => (b - a).toFixed(0) + 'ms';
+function perfReset() {
+  Object.keys(perf).forEach(k => perf[k] = 0);
+}
+function perfLogTurn() {
+  const { speechStart, silenceAt, whisperStart, whisperEnd, geminiStart, geminiEnd, speakCall, speakStart } = perf;
+  const rows = [];
+  if (speechStart && silenceAt) rows.push(['User speech duration', ms(speechStart, silenceAt)]);
+  if (silenceAt && whisperStart) rows.push(['Silence→Whisper start', ms(silenceAt, whisperStart)]);
+  if (whisperStart && whisperEnd) rows.push(['Whisper transcription', ms(whisperStart, whisperEnd)]);
+  if (whisperEnd && geminiStart) rows.push(['Whisper→Gemini start', ms(whisperEnd, geminiStart)]);
+  if (geminiStart && geminiEnd) rows.push(['Gemini reply', ms(geminiStart, geminiEnd)]);
+  if (geminiEnd && speakCall) rows.push(['Gemini→speak() call', ms(geminiEnd, speakCall)]);
+  if (speakCall && speakStart) rows.push(['LiveAvatar speak→audio start', ms(speakCall, speakStart)]);
+  if (silenceAt && speakStart) rows.push(['TOTAL: silence→Kimberly speaks', ms(silenceAt, speakStart)]);
+  console.log('%c[PERF] Turn breakdown', 'font-weight:bold;color:#CF463A');
+  console.table(rows);
+}
+
+// ─── Whisper + VAD (same as before) ───
+
+async function transcribeAudio(audioBlob) {
+  const OPENAI_API_KEY = window.__CONFIG.OPENAI_API_KEY;
+  const formData = new FormData();
+  formData.append('file', audioBlob, 'audio.webm');
+  formData.append('model', 'whisper-1');
+  formData.append('language', 'en');
+  formData.append('temperature', '0');
+  formData.append('prompt', 'Food court customer asking about stalls, dishes, halal options.');
+  formData.append('response_format', 'verbose_json');
+
+  console.log('[Whisper] sending blob, size:', audioBlob.size, 'type:', audioBlob.type);
+  perf.whisperStart = performance.now();
+  const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}` },
+    body: formData,
+  });
+
+  const raw = await res.text();
+  perf.whisperEnd = performance.now();
+  console.log('[PERF] Whisper:', ms(perf.whisperStart, perf.whisperEnd));
+  console.log('[Whisper] status:', res.status, 'body:', raw);
+  if (!res.ok) throw new Error(`Whisper ${res.status}: ${raw}`);
+  let data;
+  try { data = JSON.parse(raw); } catch { throw new Error('Whisper bad JSON: ' + raw); }
+  const segments = data.segments || [];
+  const noSpeechProb = segments.length
+    ? Math.max(...segments.map(s => s.no_speech_prob ?? 0))
+    : 0;
+  const avgLogprob = segments.length
+    ? Math.min(...segments.map(s => s.avg_logprob ?? 0))
+    : 0;
+  return {
+    text: (data.text || '').trim(),
+    noSpeechProb,
+    avgLogprob,
+  };
+}
+
+const WHISPER_NO_SPEECH_THRESHOLD = 0.6;
+const WHISPER_LOGPROB_THRESHOLD = -1.0;
+
+const WHISPER_HALLUCINATION_SUBSTRINGS = [
+  'thanks for watching', 'thank you for watching',
+  'subscribe to the channel', 'please subscribe', 'like and subscribe',
+  'dont forget to like', 'dont forget to subscribe',
+  'see you next time', 'see you in the next video',
+  'hit the bell', 'ring the bell',
+  'pissedconsumer', 'please see review', 'review no',
+];
+const WHISPER_HALLUCINATION_EXACT = [
+  'you', 'thank you', 'thanks', 'bye', 'okay', 'ok',
+  '.', '...', 'music', '[music]', '(music)', 'applause', '[applause]',
+];
+
+function isHallucination(text) {
+  if (!text) return true;
+  const norm = text.toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (norm.length < 2) return true;
+  if (WHISPER_HALLUCINATION_EXACT.includes(norm)) return true;
+  if (WHISPER_HALLUCINATION_SUBSTRINGS.some(sub => norm.includes(sub))) return true;
+  if (/\b(?:https?:\/\/|www\.|\.com|\.org|\.net|\.io)\b/i.test(text)) return true;
+  if (/[^\x00-\x7F]/.test(text)) return true;
+  return false;
+}
+
+const VAD_SPEECH_THRESHOLD = 0.02;
+const VAD_SILENCE_MS = 2000;
+const VAD_MIN_SPEECH_MS = 500;
+const VAD_MIN_LOUD_FRAMES = 8;
+
+function useVoiceActivity({ enabled, paused, onUtterance, onRejected }) {
+  const [isListening, setIsListening] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [supported, setSupported] = useState(true);
+  const onRejectedRef = useRef(onRejected);
+  useEffect(() => { onRejectedRef.current = onRejected; }, [onRejected]);
+
+  const streamRef = useRef(null);
+  const audioCtxRef = useRef(null);
+  const analyserRef = useRef(null);
+  const rafRef = useRef(null);
+  const recorderRef = useRef(null);
+  const chunksRef = useRef([]);
+  const speakingRef = useRef(false);
+  const speechStartRef = useRef(0);
+  const lastVoiceAtRef = useRef(0);
+  const loudFramesRef = useRef(0);
+  const pausedRef = useRef(paused);
+  const committedRef = useRef(false);
+  const prevPausedRef = useRef(paused);
+  const onUtteranceRef = useRef(onUtterance);
+
+  useEffect(() => { pausedRef.current = paused; }, [paused]);
+  useEffect(() => { onUtteranceRef.current = onUtterance; }, [onUtterance]);
+
+  useEffect(() => {
+    if (prevPausedRef.current && !paused) {
+      committedRef.current = false;
+      console.log('[VAD] thaw — ready to listen');
+    }
+    prevPausedRef.current = paused;
+  }, [paused]);
+
+  useEffect(() => {
+    if (paused && speakingRef.current) {
+      speakingRef.current = false;
+      setIsSpeaking(false);
+      if (recorderRef.current && recorderRef.current.state === 'recording') {
+        recorderRef.current._discard = true;
+        try { recorderRef.current.stop(); } catch (e) {}
+      }
+    }
+  }, [paused]);
+
+  useEffect(() => {
+    if (!enabled) return;
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setSupported(false);
+      return;
+    }
+    let cancelled = false;
+
+    async function start() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+        });
+        if (cancelled) { stream.getTracks().forEach(t => t.stop()); return; }
+        streamRef.current = stream;
+
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        const ctx = new AudioCtx();
+        audioCtxRef.current = ctx;
+        const source = ctx.createMediaStreamSource(stream);
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 1024;
+        source.connect(analyser);
+        analyserRef.current = analyser;
+
+        const data = new Uint8Array(analyser.fftSize);
+        setIsListening(true);
+
+        const tick = () => {
+          rafRef.current = requestAnimationFrame(tick);
+          if (pausedRef.current || committedRef.current) return;
+
+          analyser.getByteTimeDomainData(data);
+          let sum = 0;
+          for (let i = 0; i < data.length; i++) {
+            const v = (data[i] - 128) / 128;
+            sum += v * v;
+          }
+          const rms = Math.sqrt(sum / data.length);
+          const now = performance.now();
+
+          if (rms > VAD_SPEECH_THRESHOLD) {
+            lastVoiceAtRef.current = now;
+            loudFramesRef.current += 1;
+            if (!speakingRef.current) {
+              speakingRef.current = true;
+              speechStartRef.current = now;
+              setIsSpeaking(true);
+              perfReset();
+              perf.speechStart = performance.now();
+              console.log('[PERF] speech start');
+              startRecording();
+            }
+          } else if (speakingRef.current) {
+            const silentFor = now - lastVoiceAtRef.current;
+            const spokeFor = now - speechStartRef.current;
+            if (silentFor > VAD_SILENCE_MS) {
+              speakingRef.current = false;
+              setIsSpeaking(false);
+              const keep = spokeFor >= VAD_MIN_SPEECH_MS
+                        && loudFramesRef.current >= VAD_MIN_LOUD_FRAMES;
+              if (keep) {
+                committedRef.current = true;
+                perf.silenceAt = performance.now() - VAD_SILENCE_MS;
+                console.log('[PERF] silence detected — committing, loudFrames:', loudFramesRef.current, 'spokeFor:', spokeFor.toFixed(0) + 'ms');
+              } else {
+                console.log('[VAD] discarded — too short/quiet, loudFrames:', loudFramesRef.current, 'spokeFor:', spokeFor);
+              }
+              loudFramesRef.current = 0;
+              stopRecording(keep);
+            }
+          }
+        };
+        tick();
+      } catch (err) {
+        console.error("Mic access error:", err);
+        setSupported(false);
+      }
+    }
+
+    function startRecording() {
+      if (!streamRef.current) return;
+      if (recorderRef.current && recorderRef.current.state === 'recording') return;
+      try {
+        const rec = new MediaRecorder(streamRef.current, { mimeType: 'audio/webm' });
+        chunksRef.current = [];
+        rec.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+        rec.onstop = async () => {
+          const discard = rec._discard === true;
+          const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
+          chunksRef.current = [];
+          if (discard || blob.size === 0) {
+            console.log('[VAD] discarded utterance');
+            committedRef.current = false;
+            setIsTranscribing(false);
+            return;
+          }
+          setIsTranscribing(true);
+          try {
+            const { text, noSpeechProb, avgLogprob } = await transcribeAudio(blob);
+            const clean = (text || '').trim();
+            console.log('[VAD] Whisper:', JSON.stringify(clean), 'no_speech:', noSpeechProb.toFixed(2), 'logprob:', avgLogprob.toFixed(2));
+            const lowConfidence = noSpeechProb > WHISPER_NO_SPEECH_THRESHOLD || avgLogprob < WHISPER_LOGPROB_THRESHOLD;
+            if (clean && !isHallucination(clean) && !lowConfidence && onUtteranceRef.current) {
+              onUtteranceRef.current(clean);
+            } else {
+              const reason = !clean ? 'empty' : lowConfidence ? 'low-confidence' : 'hallucination';
+              console.log('[VAD] rejected (' + reason + '):', JSON.stringify(clean));
+              committedRef.current = false;
+              if (onRejectedRef.current) onRejectedRef.current(reason);
+            }
+          } catch (err) {
+            console.error("Whisper error:", err);
+            committedRef.current = false;
+            if (onRejectedRef.current) onRejectedRef.current('error');
+          } finally {
+            setIsTranscribing(false);
+          }
+        };
+        recorderRef.current = rec;
+        rec.start();
+      } catch (e) {
+        console.error('Recorder start error', e);
+      }
+    }
+
+    function stopRecording(keep) {
+      const rec = recorderRef.current;
+      if (!rec || rec.state !== 'recording') return;
+      rec._discard = !keep;
+      try { rec.stop(); } catch (e) {}
+    }
+
+    start();
+
+    return () => {
+      cancelled = true;
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      if (recorderRef.current && recorderRef.current.state === 'recording') {
+        recorderRef.current._discard = true;
+        try { recorderRef.current.stop(); } catch (e) {}
+      }
+      if (audioCtxRef.current) { try { audioCtxRef.current.close(); } catch (e) {} }
+      if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
+      setIsListening(false);
+      setIsSpeaking(false);
+    };
+  }, [enabled]);
+
+  return { isListening, isSpeaking, isTranscribing, supported };
+}
+
+// ─── Nav Button Component ───
+
+function NavButton({ icon, label, active }) {
+  return (
+    <div style={{
+      width: 267, height: 257,
+      background: active ? RED : "rgba(254, 254, 254, 0.8)",
+      border: active ? `5px solid ${GOLD}` : "5px solid #B0B0B0",
+      boxShadow: active ? `0px 4px 40px ${GOLD}` : "0px 4px 40px rgba(0, 0, 0, 0.25)",
+      borderRadius: 50,
+      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+      gap: 12, cursor: "pointer",
+    }}>
+      <div style={{ color: active ? WHITE : DARK_TEXT }} dangerouslySetInnerHTML={{ __html: icon }} />
+      <span style={{
+        fontWeight: 600, fontSize: 40, lineHeight: "48px",
+        color: active ? WHITE : DARK_TEXT, textAlign: "center",
+      }}>{label}</span>
+    </div>
+  );
+}
+
+// ─── SVG Icons ───
+
+const ICONS = {
+  home: `<svg width="96" height="96" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>`,
+  seats: `<svg width="96" height="96" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>`,
+  stores: `<svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>`,
+  food: `<svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z"/></svg>`,
+  chat: `<svg width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/></svg>`,
+  mic: `<svg width="127" height="123" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>`,
+};
+
+// ─── Gemini LLM ───
+
+const SYSTEM_PROMPT = `You are Kimberly, AI concierge at ${MALL_NAME}. There are 21 stalls.
+IMPORTANT: Always recommend exactly ONE stall and ONE dish. Never suggest multiple stalls or multiple dishes. Pick the single best match for what the person wants.
+When recommending, always mention the stall number (e.g. "Stall 5").
+ALWAYS make a recommendation — never just ask a clarifying question. Even if the request is vague (e.g. "food stores", "what do you have"), pick your top recommendation and offer it.
+For health-related requests (gastric, sore throat, flu, post-surgery), recommend light and gentle options like porridge (Stall 8), vegetarian (Stall 5), or soup (Stall 10/11). Avoid heavy or rich dishes like organ meats.
+Halal rule: pork, lard, char siew, bak kut teh, bak chor mee, pig organ, roast pork, wanton (with pork), and alcohol are never halal. If the user asks for something contradictory like "halal pork", "halal bak kut teh", or "halal char siew", politely point out that pork is not halal and suggest a genuinely halal alternative (e.g. halal chicken rice at Stall 14, beef rendang at Stall 19, ayam penyet at Stall 20). Never pretend a non-halal dish is halal.
+Be friendly, warm, and conversational. Always respond in 4-6 sentences — never fewer than 4.
+Reply in plain text only. Do not use markdown, asterisks, bold, italics, bullet points, or any formatting symbols — the text is spoken aloud.
+Here is the stall directory:\n` + BRANDS.map(b =>
+  `Stall ${b.stall}: ${b.brand} (${b.cuisine})${b.halal ? ' [Halal]' : ''} - ${b.signature}. ${b.desc}`
+).join('\n');
+
+async function callGemini(conversationHistory) {
+  const GEMINI_API_KEY = window.__CONFIG.GEMINI_API_KEY;
+  const GEMINI_MODEL = window.__CONFIG.GEMINI_MODEL;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+
+  const contents = conversationHistory.map(msg => ({
+    role: msg.role === 'assistant' ? 'model' : 'user',
+    parts: [{ text: msg.content }]
+  }));
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+      contents,
+    })
+  });
+
+  if (!res.ok) throw new Error(`Gemini API error: ${res.status}`);
+  const data = await res.json();
+  const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || 'Sorry, I could not generate a response.';
+  return raw
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\*(.*?)\*/g, '$1')
+    .replace(/_{1,2}(.*?)_{1,2}/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/^\s*[-*+]\s+/gm, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
+// ─── LiveAvatar Integration ───
+
+async function createLiveAvatarSession(avatarId) {
+  const API_KEY = window.__CONFIG.LIVEAVATAR_API_KEY;
+  const res = await fetch('https://api.liveavatar.com/v1/sessions/token', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-API-KEY': API_KEY
+    },
+    body: JSON.stringify({
+      avatar_id: avatarId,
+      mode: 'FULL',
+      is_sandbox: false,
+      video_settings: { quality: 'high', encoding: 'H264' },
+      voice_id: window.__CONFIG.LIVEAVATAR_VOICE_ID,
+      avatar_persona: {
+        first_message: "Hello! I'm Kimberly, your AI concierge here at Kopitiam, Tan Tock Seng Hospital. We have 21 food stalls with local favourites, halal options, and more. What are you in the mood for?",
+        system_prompt: `You are Kimberly, AI concierge at Kopitiam in Tan Tock Seng Hospital. There are 21 food stalls.
+IMPORTANT: Always recommend exactly ONE stall and ONE dish. Never suggest multiple stalls.
+When recommending, always mention the stall number.
+ALWAYS make a recommendation — never just ask clarifying questions.
+Be friendly, warm, and conversational. Respond in 4-6 sentences.
+
+Here is the stall directory:
+Stall 1: Kaffe Toast (Western) - Toast bread sets with eggs and kaya
+Stall 2: Toast Box (Western) - Thick toast with various toppings
+Stall 3: Yaohan Kaya Toast (Singaporean) - Traditional kaya toast
+Stall 4: Takahashi (Japanese) - Volcano chicken, stone bowls
+Stall 5: Thoh @ The Pan (Indian) [Halal] - Prata, thosai, murtabak
+Stall 6: Suntown Cafe (Western) - Chicken chop, steak, pasta
+Stall 7: Wang Dae Bak (Korean) - BBQ pork, kimchi soup, army stew
+Stall 8: Zhou's Kitchen (Chinese) - Porridge, Cantonese-style
+Stall 9: Affordable Nasi Lemak (Malay) - Nasi lemak with sides
+Stall 10: ILA [India] (Indian) [Halal] - Prata, briyani, Indian snacks
+Stall 11: Malay Street (Malay) [Halal] - Nasi lemak, mee rebus
+Stall 12: Hong Luo Chinese Pastry (Chinese) - Handmade buns, pau
+Stall 13: Nature's Vitamin (Beverages) - Fresh juices, smoothies
+Stall 14: Santiago (Western) [Halal] - Chicken rice, roasted meat
+Stall 15: Monster Chili Mala Hot Pot (Chinese) [Halal] - Mala hotpot, customizable spice
+Stall 16: Chef-on! (Western) [Halal] - Pasta, grill, zi char
+Stall 17: Penang Kitchen (Peranakan) - Laksa, char kway teow
+Stall 18: Superfish (Chinese) - Fish soup, sliced fish
+Stall 19: Coastal Rhythm (Indonesian) [Halal] - Beef rendang, ayam penyet
+Stall 20: Tsuru-Hashi (Japanese) - Donburi, udon, salmon
+Stall 21: Qing Zun Ge (Chinese) - Herbal soup, vegetarian options`
+      }
+    })
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`LiveAvatar session error: ${res.status} - ${err}`);
+  }
+
+  const data = await res.json();
+  return {
+    sessionId: data.data.session_id,
+    sessionToken: data.data.session_token
+  };
+}
+
+async function startLiveAvatarSession(sessionId, sessionToken) {
+  const API_KEY = window.__CONFIG.LIVEAVATAR_API_KEY;
+  const res = await fetch('https://api.liveavatar.com/v1/sessions/start', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-API-KEY': API_KEY,
+      'Authorization': `Bearer ${sessionToken}`
+    },
+    body: JSON.stringify({
+      session_id: sessionId,
+      sdp_offer: ''
+    })
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`LiveAvatar start error: ${res.status} - ${err}`);
+  }
+
+  const data = await res.json();
+  return {
+    livekitUrl: data.data.livekit_url,
+    livekitToken: data.data.livekit_client_token,
+    maxDuration: data.data.max_session_duration
+  };
+}
+
+// Connect to LiveKit room
+async function connectToLiveKit(livekitUrl, livekitToken, sessionId, onTrack, onDataMessage, onSpeak) {
+  const room = new LivekitClient.Room();
+
+  // Connect to LiveKit
+  await room.connect(livekitUrl, livekitToken);
+
+  console.log('[LiveAvatar] Connected to LiveKit, participants:', room.remoteParticipants.size);
+
+  // Publish user's microphone audio so LiveAvatar can hear and transcribe
+  try {
+    const micStream = await navigator.mediaDevices.getUserMedia({
+      audio: true  // Use default audio settings without processing
+    });
+
+    const audioTrack = micStream.getAudioTracks()[0];
+    await room.localParticipant.publishTrack(audioTrack, { name: 'microphone' });
+    console.log('[LiveAvatar] Published microphone audio');
+  } catch (err) {
+    console.error('[LiveAvatar] Failed to publish microphone:', err);
+  }
+
+  // Expose the speak function (not used in FULL mode but available for custom input)
+  onSpeak({
+    speak: async (text) => {
+      // In FULL mode, LiveAvatar handles everything automatically
+      // This function is available for custom text input if needed
+      console.log('[LiveAvatar] Custom text (not sent in FULL mode):', text.slice(0, 50));
+      return true;
+    }
+  });
+
+  // Listen for track subscriptions (audio/video from avatar)
+  room.on('trackSubscribed', (track, publication, participant) => {
+    console.log('[LiveAvatar] Track subscribed:', track.kind);
+    onTrack(track);
+  });
+
+  // Listen for data messages (response events from LiveAvatar)
+  room.on('dataReceived', (payload, participant, kind, topic) => {
+    const text = new TextDecoder().decode(payload);
+    console.log('[LiveAvatar] ========== Data received ==========');
+    console.log('[LiveAvatar] topic:', topic);
+    console.log('[LiveAvatar] kind:', kind);
+    console.log('[LiveAvatar] participant:', participant?.identity);
+    console.log('[LiveAvatar] text:', text.slice(0, 500));
+    console.log('[LiveAvatar] =====================================');
+
+    try {
+      const event = JSON.parse(text);
+      console.log('[LiveAvatar] Parsed event type:', event.event_type);
+      console.log('[LiveAvatar] Full event:', JSON.stringify(event, null, 2));
+
+      // Handle response events
+      if (event.event_type === 'avatar.speak_started') {
+        onDataMessage({ type: 'speaking_start' });
+      } else if (event.event_type === 'avatar.speak_ended') {
+        onDataMessage({ type: 'speaking_end' });
+      } else if (event.event_type === 'avatar.transcription') {
+        // User speech transcription from LiveAvatar
+        onDataMessage({ type: 'user_transcription', text: event.text });
+      } else if (event.event_type === 'avatar.response') {
+        // Avatar's LLM response
+        onDataMessage({ type: 'avatar_response', text: event.text });
+      }
+    } catch (e) {
+      console.log('[LiveAvatar] Non-JSON data:', text.slice(0, 100));
+    }
+  });
+
+  // Handle existing tracks (avatar might already be in room)
+  room.remoteParticipants.forEach((participant) => {
+    console.log('[LiveAvatar] Participant:', participant.identity);
+    participant.trackPublications.forEach((pub) => {
+      if (pub.track && (pub.kind === 'video' || pub.kind === 'audio')) {
+        onTrack(pub.track);
+      }
+    });
+  });
+
+  return { room };
+}
+
+// Send text to LiveAvatar via data channel event
+async function sendTextToLiveAvatar(room, sessionId, text) {
+  if (!room || !room.localParticipant) {
+    console.error('[LiveAvatar] No room');
+    return false;
+  }
+
+  try {
+    const event = {
+      event_id: crypto.randomUUID(),
+      event_type: 'avatar.speak_text',
+      session_id: sessionId,
+      source_event_id: null,
+      text: text
+    };
+
+    const payload = new TextEncoder().encode(JSON.stringify(event));
+    // Try with topic first
+    try {
+      room.localParticipant.publishData(payload, 0, 'agent-control');
+      console.log('[LiveAvatar] Sent avatar.speak_text via agent-control:', text.slice(0, 50));
+    } catch (e) {
+      // Fallback without topic if not supported
+      room.localParticipant.publishData(payload, 0);
+      console.log('[LiveAvatar] Sent avatar.speak_text (no topic):', text.slice(0, 50));
+    }
+    return true;
+  } catch (err) {
+    console.error('[LiveAvatar] Send error:', err);
+    return false;
+  }
+}
+
+// Detect speaking from video activity (fallback if data messages don't work)
+function setupVideoSpeakingDetection(videoElement, onSpeakingStart, onSpeakingEnd) {
+  if (!videoElement) return;
+
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  let lastFrameData = null;
+  let speakingTimeout = null;
+  let frameCount = 0;
+
+  const checkInterval = setInterval(() => {
+    if (videoElement.paused || videoElement.ended) return;
+
+    canvas.width = 160;
+    canvas.height = 120;
+    ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+    const frameData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+
+    if (lastFrameData) {
+      let diff = 0;
+      for (let i = 0; i < frameData.length; i += 4) {
+        diff += Math.abs(frameData[i] - lastFrameData[i]) +
+                Math.abs(frameData[i+1] - lastFrameData[i+1]) +
+                Math.abs(frameData[i+2] - lastFrameData[i+2]);
+      }
+      const avgDiff = diff / (canvas.width * canvas.height * 3);
+
+      // Avatar is speaking if there's significant pixel change
+      const isSpeaking = avgDiff > 5;
+
+      if (isSpeaking && !speakingTimeout) {
+        if (onSpeakingStart) onSpeakingStart();
+      } else if (!isSpeaking && speakingTimeout) {
+        clearTimeout(speakingTimeout);
+        speakingTimeout = null;
+        if (onSpeakingEnd) onSpeakingEnd();
+      }
+
+      if (isSpeaking) {
+        if (speakingTimeout) clearTimeout(speakingTimeout);
+        speakingTimeout = setTimeout(() => {
+          speakingTimeout = null;
+          if (onSpeakingEnd) onSpeakingEnd();
+        }, 500);
+      }
+    }
+
+    lastFrameData = frameData;
+    frameCount++;
+  }, 100);
+
+  return () => clearInterval(checkInterval);
+}
+
+// ─── App ───
+
+function App() {
+  const [started, setStarted] = useState(false);
+  const [messages, setMessages] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
+  const [avatarConnected, setAvatarConnected] = useState(false);
+  const [videoReady, setVideoReady] = useState(false);
+  const [avatarStatus, setAvatarStatus] = useState("Initializing...");
+  const videoRef = useRef(null);
+  const livekitRoomRef = useRef(null);
+  const chatEndRef = useRef(null);
+  const speakRef = useRef(null);
+  const avatarConnectedRef = useRef(false);
+  const avatarSpeakingRef = useRef(false);
+  const avatarVideoTrackRef = useRef(null);
+  const avatarAudioTrackRef = useRef(null);
+  const liveAvatarSessionIdRef = useRef(null);
+
+  const LIVEAVATAR_API_KEY = window.__CONFIG?.LIVEAVATAR_API_KEY;
+  const LIVEAVATAR_AVATAR_ID = window.__CONFIG?.LIVEAVATAR_AVATAR_ID;
+  const LIVEAVATAR_VOICE_ID = window.__CONFIG?.LIVEAVATAR_VOICE_ID;
+
+  useEffect(() => {
+    if (chatEndRef.current) chatEndRef.current.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  // Connect LiveAvatar after user clicks Start
+  useEffect(() => {
+    if (!started) return;
+    let cancelled = false;
+
+    async function connectLiveAvatar() {
+      try {
+        setAvatarStatus("Creating session...");
+        console.log('[LiveAvatar] Creating session for avatar:', LIVEAVATAR_AVATAR_ID);
+
+        const { sessionId, sessionToken } = await createLiveAvatarSession(
+          LIVEAVATAR_AVATAR_ID
+        );
+
+        if (cancelled) return;
+
+        liveAvatarSessionIdRef.current = sessionId;
+        console.log('[LiveAvatar] Session created:', sessionId);
+        setAvatarStatus("Connecting to avatar...");
+
+        const { livekitUrl, livekitToken } = await startLiveAvatarSession(sessionId, sessionToken);
+
+        if (cancelled) return;
+
+        console.log('[LiveAvatar] Starting LiveKit connection...');
+
+        const { room } = await connectToLiveKit(
+          livekitUrl,
+          livekitToken,
+          sessionId,
+          (track) => {
+            console.log('[LiveAvatar] Track received:', track.kind);
+            // Store the tracks
+            if (track.kind === 'video') {
+              avatarVideoTrackRef.current = track.mediaStreamTrack;
+            } else if (track.kind === 'audio') {
+              avatarAudioTrackRef.current = track.mediaStreamTrack;
+            }
+
+            // When we have both tracks (or at least one), update the MediaStream
+            if (videoRef.current && (avatarVideoTrackRef.current || avatarAudioTrackRef.current)) {
+              const tracks = [];
+              if (avatarVideoTrackRef.current) tracks.push(avatarVideoTrackRef.current);
+              if (avatarAudioTrackRef.current) tracks.push(avatarAudioTrackRef.current);
+
+              videoRef.current.srcObject = new MediaStream(tracks);
+              videoRef.current.onloadedmetadata = () => {
+                videoRef.current.play().catch((e) => console.log('[LiveAvatar] Play error:', e));
+                // Set up video-based speaking detection as fallback
+                if (avatarVideoTrackRef.current && !avatarVideoTrackRef.current._speakingDetectionSetup) {
+                  avatarVideoTrackRef.current._speakingDetectionSetup = true;
+                  setupVideoSpeakingDetection(
+                    videoRef.current,
+                    () => {
+                      if (!avatarSpeakingRef.current) {
+                        setSpeaking(true);
+                        avatarSpeakingRef.current = true;
+                      }
+                    },
+                    () => {
+                      if (avatarSpeakingRef.current) {
+                        setSpeaking(false);
+                        avatarSpeakingRef.current = false;
+                      }
+                    }
+                  );
+                }
+              };
+              videoRef.current.play().catch(() => {});
+            }
+
+            setVideoReady(true);
+            setAvatarStatus("Connected! Speak to Kimberly...");
+            setAvatarConnected(true);
+            avatarConnectedRef.current = true;
+          },
+          (data) => {
+            // Handle data messages from LiveAvatar
+            console.log('[LiveAvatar] Data message:', data);
+
+            if (data.type === 'speaking_start') {
+              setSpeaking(true);
+              setLoading(false);
+            } else if (data.type === 'speaking_end') {
+              setSpeaking(false);
+            } else if (data.type === 'user_transcription') {
+              // User speech transcription from LiveAvatar
+              console.log('[LiveAvatar] User said:', data.text);
+              setMessages(prev => [...prev, { role: 'user', content: data.text }]);
+            } else if (data.type === 'avatar_response') {
+              // Avatar's LLM response
+              console.log('[LiveAvatar] Avatar response:', data.text);
+              setMessages(prev => [...prev, { role: 'assistant', content: data.text }]);
+            }
+          },
+          (speakApi) => {
+            // Store the speak function for later use (not needed in FULL mode but available)
+            speakRef.current = speakApi.speak;
+            // In FULL mode, first_message triggers automatically
+          }
+        );
+
+        if (cancelled) {
+          room.disconnect();
+          return;
+        }
+
+        livekitRoomRef.current = room;
+
+        console.log('[LiveAvatar] Connected successfully');
+      } catch (err) {
+        console.error("LiveAvatar connect error:", err);
+        setAvatarStatus("Error: " + err.message);
+      }
+    }
+
+    connectLiveAvatar();
+
+    // Cleanup on unmount
+    return () => {
+      cancelled = true;
+      if (livekitRoomRef.current) {
+        try { livekitRoomRef.current.disconnect(); } catch (e) {}
+      }
+    };
+  }, [started]);
+
+  // ─── Start Screen ───
+  if (!started) {
+    return (
+      <div style={{
+        width: 2160, height: 3840, position: "relative", background: WHITE,
+        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+        backgroundImage: "linear-gradient(0deg, rgba(232,232,232,0.82), rgba(232,232,232,0.82)), url(assets/background.png)",
+        backgroundSize: "cover", backgroundPosition: "center",
+      }}>
+        <img src="assets/kopitiam-logo.png" alt="Kopitiam" style={{ width: 800, marginBottom: 40 }} onError={(e) => { e.target.style.display = 'none'; }} />
+        <div style={{ fontSize: 64, fontWeight: 600, color: "#000", marginBottom: 40 }}>AI CONCIERGE</div>
+        <button onClick={() => setStarted(true)} style={{
+          padding: "40px 100px", background: RED, color: WHITE,
+          border: "none", borderRadius: 30, fontSize: 48, fontWeight: 700,
+          cursor: "pointer", boxShadow: "0 4px 40px rgba(207,70,58,0.4)"
+        }}>
+          Start Conversation
+        </button>
+        <div style={{ color: "#888", fontSize: 32, marginTop: 30 }}>Tap to begin</div>
+      </div>
+    );
+  }
+
+  // ─── Main Kiosk Screen ───
+  return (
+    <div style={{
+      width: 2160, height: 3840, position: "relative", background: WHITE, overflow: "hidden",
+      backgroundImage: "linear-gradient(0deg, rgba(232,232,232,0.82), rgba(232,232,232,0.82)), url(assets/background.png)",
+      backgroundSize: "cover", backgroundPosition: "center",
+    }}>
+
+      {/* ── Header: Logo + AI CONCIERGE ── */}
+      <div style={{ position: "absolute", top: 0, left: 0, width: 2160, textAlign: "center" }}>
+        <div style={{
+          fontWeight: 500, fontSize: 40, lineHeight: "48px", letterSpacing: "0.2em",
+          color: "#000", marginTop: 91,
+        }}>WELCOME TO</div>
+        <img src="assets/kopitiam-logo.png" alt="Kopitiam" style={{
+          width: 1222, height: "auto", margin: "0 auto", display: "block",
+        }} onError={(e) => {
+          e.target.outerHTML = '<div style="font-size:120px;font-weight:800;color:#CF463A;font-style:italic;margin:20px 0;">KOPITIAM</div>';
+        }} />
+        <div style={{
+          fontWeight: 500, fontSize: 40, lineHeight: "48px", letterSpacing: "0.2em",
+          color: "#000", marginTop: 10,
+        }}>AI CONCIERGE</div>
+      </div>
+
+      {/* ── Left Sidebar Nav ── */}
+      <div style={{
+        position: "absolute", left: 59, top: 340,
+        display: "flex", flexDirection: "column", gap: 29,
+      }}>
+        <NavButton icon={ICONS.home} label="Home" />
+        <NavButton icon={ICONS.seats} label="Seats" />
+        <NavButton icon={ICONS.stores} label="Stores" />
+        <NavButton icon={ICONS.food} label="Food" />
+        <NavButton icon={ICONS.chat} label={<span style={{ fontSize: 36, lineHeight: "40px" }}>Chat with<br/>me</span>} active />
+      </div>
+
+      {/* ── Kimberly Avatar (LiveAvatar video, right side) ── */}
+      <div style={{
+        position: "absolute", width: 900, height: 900,
+        left: 1200, top: 440, overflow: "hidden",
+        borderRadius: "50%",
+        border: `6px solid ${GOLD}`,
+        boxShadow: speaking ? `0 0 60px rgba(245,177,80,0.4)` : "0 8px 40px rgba(0,0,0,0.15)",
+        transition: "all 0.3s",
+      }}>
+        <video ref={videoRef} autoPlay playsInline
+          onLoadedMetadata={() => { if (videoRef.current) videoRef.current.play().catch(() => {}); }}
+          style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center top" }}
+        />
+        {!videoReady && (
+          <div style={{
+            position: "absolute", inset: 0, display: "flex", flexDirection: "column",
+            alignItems: "center", justifyContent: "center",
+            background: "linear-gradient(180deg, #f4e6d0 0%, #e8d4b0 100%)",
+          }}>
+            <svg width="320" height="320" viewBox="0 0 200 200" style={{ opacity: 0.35 }}>
+              <circle cx="100" cy="75" r="38" fill={RED} />
+              <path d="M 30 200 Q 30 115 100 115 Q 170 115 170 200 Z" fill={RED} />
+            </svg>
+            <div style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 24 }}>
+              <div style={{ width: 32, height: 32, border: "3px solid rgba(207,70,58,0.25)", borderTopColor: RED, borderRadius: "50%", animation: "spin 1s linear infinite" }} />
+              <span style={{ color: "#7a5a3a", fontSize: 30, fontWeight: 500 }}>
+                {avatarConnected ? "Kimberly is getting ready..." : avatarStatus}
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── Chat Area ── */}
+      <div style={{
+        position: "absolute", left: 400, top: 500, width: 750, height: 1150,
+        display: "flex", flexDirection: "column",
+        background: "transparent", borderRadius: 30,
+        padding: 20,
+      }}>
+        <div style={{
+          flex: 1, overflowY: "auto",
+          display: "flex", flexDirection: "column", gap: 24,
+        }}>
+          {messages.length === 0 && !loading && (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
+              <div style={{ fontWeight: 600, fontSize: 30, color: RED, marginBottom: 8, marginLeft: 8 }}>Kimberly</div>
+              <div style={{
+                background: "rgba(245, 177, 80, 0.6)",
+                borderRadius: "20px 20px 20px 4px",
+                padding: "24px 32px", maxWidth: "70%",
+                fontSize: 32, lineHeight: "42px", color: "#000",
+              }}>
+                Hello! I'm Kimberly, your AI concierge here at Kopitiam, Tan Tock Seng Hospital. We have 21 food stalls with local favourites, halal options, and more. What are you in the mood for?
+              </div>
+            </div>
+          )}
+
+          {messages.map((msg, i) => (
+            msg.role === 'user' ? (
+              <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+                <div style={{ fontWeight: 600, fontSize: 30, color: "#555", marginBottom: 8, marginRight: 8 }}>You</div>
+                <div style={{
+                  background: RED,
+                  borderRadius: "20px 20px 4px 20px",
+                  padding: "24px 32px", maxWidth: "70%",
+                  fontSize: 32, lineHeight: "42px", color: WHITE,
+                }}>
+                  {msg.content}
+                </div>
+              </div>
+            ) : (
+              <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
+                <div style={{ fontWeight: 600, fontSize: 30, color: RED, marginBottom: 8, marginLeft: 8 }}>Kimberly</div>
+                <div style={{
+                  background: "rgba(245, 177, 80, 0.6)",
+                  borderRadius: "20px 20px 20px 4px",
+                  padding: "24px 32px", maxWidth: "70%",
+                  fontSize: 32, lineHeight: "42px",
+                  color: "#000",
+                }}>
+                  {msg.content}
+                </div>
+              </div>
+            )
+          ))}
+
+          {loading && (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
+              <div style={{ fontWeight: 600, fontSize: 30, color: RED, marginBottom: 8, marginLeft: 8 }}>Kimberly</div>
+              <div style={{
+                background: "rgba(245, 177, 80, 0.3)",
+                borderRadius: "20px 20px 20px 4px",
+                padding: "24px 32px",
+                fontSize: 32, lineHeight: "42px", color: "#666",
+              }}>
+                <span style={{ animation: "pulse 1.5s infinite" }}>
+                  Thinking...
+                </span>
+              </div>
+            </div>
+          )}
+
+          <div ref={chatEndRef} />
+        </div>
+      </div>
+
+      {/* ── Voice status indicator ── */}
+      <div style={{
+        position: "absolute", left: "50%", top: 1830,
+        transform: "translateX(-50%)",
+        display: "flex", flexDirection: "column", alignItems: "center", gap: 16,
+      }}>
+        <div style={{
+          display: "flex", alignItems: "center", gap: 20,
+          padding: "24px 48px", borderRadius: 60,
+          background: WHITE,
+          border: `4px solid ${speaking || loading ? "#ccc" : GOLD}`,
+          boxShadow: "0 4px 20px rgba(0,0,0,0.08)",
+          transition: "all 0.3s",
+        }}>
+          <div style={{
+            width: 28, height: 28, borderRadius: "50%",
+            background: (speaking || loading) ? "#ccc" : "#4CAF50",
+          }} />
+          <span style={{
+            fontSize: 36, fontWeight: 600,
+            color: (speaking || loading) ? "#888" : DARK_TEXT,
+          }}>
+            {speaking ? "Kimberly is speaking…"
+              : loading ? "Thinking…"
+              : avatarConnected ? "Just speak — I'm listening"
+              : "Connecting…"}
+          </span>
+        </div>
+        {!avatarConnected && (
+          <div style={{ color: "#888", fontSize: 28 }}>{avatarStatus}</div>
+        )}
+      </div>
+
+      {/* ── Bottom Sponsor Bar ── */}
+      <div style={{
+        position: "absolute", left: 0, top: 3454, width: 2160, height: 386,
+      }}>
+        <img src="assets/sponsor-bar.png" alt="Sponsors" style={{
+          width: "100%", height: "100%", objectFit: "cover",
+        }} onError={(e) => {
+          e.target.outerHTML = '<div style="width:100%;height:100%;background:#f5f5f5;display:flex;align-items:center;justify-content:center;color:#ccc;font-size:40px;">Sponsor Bar</div>';
+        }} />
+      </div>
+
+      {/* ── Restart Button ── */}
+      <button disabled={messages.length === 0 || speaking || loading} onClick={() => {
+        setMessages([]);
+        setLoading(false);
+        userSpokeFirstRef.current = false;
+      }} style={{
+        position: "absolute", left: 80, top: 1891,
+        transform: "translateY(-50%)",
+        padding: "24px 48px",
+        background: WHITE,
+        border: "3px solid #ccc",
+        borderRadius: 20,
+        fontSize: 36, fontWeight: 500,
+        color: DARK_TEXT,
+        cursor: (messages.length === 0 || speaking || loading) ? "not-allowed" : "pointer",
+        opacity: (messages.length === 0 || speaking || loading) ? 0.4 : 1,
+        transition: "opacity 0.3s",
+      }}>
+        Restart Conversation
+      </button>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>

@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LiveAvatar Test</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #1a1a1e;
+  color: #fff;
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+h1 { margin-bottom: 20px; }
+.section {
+  background: #2a2a2e;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+.video-container {
+  width: 512px;
+  height: 512px;
+  background: #000;
+  border-radius: 50%;
+  overflow: hidden;
+  margin: 20px auto;
+  border: 4px solid #F5B150;
+}
+video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+button {
+  background: #CF463A;
+  color: #fff;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 16px;
+  cursor: pointer;
+  margin-right: 10px;
+  margin-bottom: 10px;
+}
+button:hover { background: #b0382e; }
+button:disabled { background: #555; cursor: not-allowed; }
+textarea {
+  width: 100%;
+  height: 100px;
+  background: #1a1a1e;
+  border: 1px solid #444;
+  border-radius: 8px;
+  color: #fff;
+  padding: 12px;
+  font-size: 14px;
+  font-family: monospace;
+  resize: vertical;
+}
+.log {
+  font-family: monospace;
+  font-size: 12px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+.log-entry { margin-bottom: 4px; }
+.log-entry.error { color: #ff6b6b; }
+.log-entry.success { color: #51cf66; }
+.log-entry.info { color: #74c0fc; }
+.select {
+  width: 100%;
+  background: #1a1a1e;
+  border: 1px solid #444;
+  border-radius: 8px;
+  color: #fff;
+  padding: 12px;
+  font-size: 14px;
+  margin-bottom: 10px;
+}
+</style>
+</head>
+<body>
+<h1>🎭 LiveAvatar Test</h1>
+
+<div class="section">
+  <h3>1. List Avatars</h3>
+  <p style="color:#888;margin-bottom:10px;">Fetches available avatars from LiveAvatar API</p>
+  <button onclick="listAvatars()">List Public Avatars</button>
+  <button onclick="listUserAvatars()">List My Avatars</button>
+  <div id="avatarList" style="margin-top:15px;"></div>
+</div>
+
+<div class="section">
+  <h3>2. Create Session & Connect</h3>
+  <p style="color:#888;margin-bottom:10px;">Create a LiveAvatar session (CUSTOM mode for our own LLM)</p>
+  <select id="avatarSelect" class="select">
+    <option value="">-- Select Avatar --</option>
+  </select>
+  <button onclick="createSession()" id="createBtn">Create Session</button>
+  <button onclick="startStream()" id="streamBtn" disabled>Start WebRTC Stream</button>
+  <button onclick="stopSession()" id="stopBtn" disabled>Stop Session</button>
+</div>
+
+<div class="section">
+  <h3>3. Video Preview</h3>
+  <div class="video-container">
+    <video id="avatarVideo" autoplay playsinline muted></video>
+  </div>
+  <p id="status" style="text-align:center;color:#888;">Not connected</p>
+</div>
+
+<div class="section">
+  <h3>4. Test Speaking (Text-to-Speech)</h3>
+  <p style="color:#888;margin-bottom:10px;">Send text for avatar to speak</p>
+  <textarea id="textInput" placeholder="Enter text for avatar to speak...">Hello! I am Kimberly, your AI concierge. What would you like to eat today?</textarea>
+  <div style="margin-top:10px;">
+    <button onclick="speakText()" id="speakBtn" disabled>Speak Text</button>
+  </div>
+</div>
+
+<div class="section">
+  <h3>5. Log</h3>
+  <div id="log" class="log"></div>
+  <button onclick="clearLog()" style="margin-top:10px;">Clear Log</button>
+</div>
+
+<script>
+const LIVEAVATAR_API_KEY = 'e18a9de2-4852-11f1-8d28-066a7fa2e369';
+const API_BASE = 'https://api.liveavatar.com/v1';
+
+let sessionId = null;
+let sessionToken = null;
+let peerConnection = null;
+let dataChannel = null;
+let selectedAvatarId = null;
+
+function log(msg, type = 'info') {
+  const logEl = document.getElementById('log');
+  const entry = document.createElement('div');
+  entry.className = `log-entry ${type}`;
+  entry.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+  logEl.appendChild(entry);
+  logEl.scrollTop = logEl.scrollHeight;
+  console.log(`[LiveAvatar] ${msg}`);
+}
+
+function clearLog() {
+  document.getElementById('log').innerHTML = '';
+}
+
+async function listAvatars() {
+  log('Fetching public avatars...');
+  try {
+    const res = await fetch(`${API_BASE}/avatars/public`, {
+      headers: { 'X-API-KEY': LIVEAVATAR_API_KEY }
+    });
+    if (!res.ok) throw new Error(`Failed: ${res.status}`);
+    const data = await res.json();
+    log(`Found ${data.avatars?.length || 0} public avatars`, 'success');
+    displayAvatars(data.avatars || []);
+  } catch (err) {
+    log(`Error listing avatars: ${err.message}`, 'error');
+  }
+}
+
+async function listUserAvatars() {
+  log('Fetching user avatars...');
+  try {
+    const res = await fetch(`${API_BASE}/avatars`, {
+      headers: { 'X-API-KEY': LIVEAVATAR_API_KEY }
+    });
+    if (!res.ok) throw new Error(`Failed: ${res.status}`);
+    const data = await res.json();
+    log(`Found ${data.avatars?.length || 0} user avatars`, 'success');
+    displayAvatars(data.avatars || []);
+  } catch (err) {
+    log(`Error listing user avatars: ${err.message}`, 'error');
+  }
+}
+
+function displayAvatars(avatars) {
+  const container = document.getElementById('avatarList');
+  const select = document.getElementById('avatarSelect');
+
+  if (avatars.length === 0) {
+    container.innerHTML = '<p style="color:#888;">No avatars found</p>';
+    return;
+  }
+
+  // Clear and populate select
+  select.innerHTML = '<option value="">-- Select Avatar --</option>';
+  avatars.forEach(avatar => {
+    const opt = document.createElement('option');
+    opt.value = avatar.id;
+    opt.textContent = `${avatar.name || 'Unnamed'} (${avatar.id.slice(0, 8)}...)`;
+    select.appendChild(opt);
+  });
+
+  container.innerHTML = `<p style="color:#51cf66;">Loaded ${avatars.length} avatars into dropdown</p>`;
+}
+
+async function createSession() {
+  selectedAvatarId = document.getElementById('avatarSelect').value;
+  if (!selectedAvatarId) {
+    log('Please select an avatar first', 'error');
+    return;
+  }
+
+  log(`Creating session for avatar: ${selectedAvatarId}...`);
+  document.getElementById('createBtn').disabled = true;
+
+  try {
+    const res = await fetch(`${API_BASE}/sessions/token`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-API-KEY': LIVEAVATAR_API_KEY
+      },
+      body: JSON.stringify({
+        avatar_id: selectedAvatarId,
+        mode: 'CUSTOM',  // We'll use our own LLM (Gemini)
+        video_settings: {
+          quality: 'high',
+          encoding: 'H264'
+        },
+        is_sandbox: false
+      })
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`Failed: ${res.status} - ${err}`);
+    }
+
+    const data = await res.json();
+    sessionId = data.data.session_id;
+    sessionToken = data.data.session_token;
+
+    log(`Session created! ID: ${sessionId}`, 'success');
+    document.getElementById('streamBtn').disabled = false;
+    document.getElementById('stopBtn').disabled = false;
+    document.getElementById('status').textContent = 'Session ready - click Start Stream';
+  } catch (err) {
+    log(`Error creating session: ${err.message}`, 'error');
+    document.getElementById('createBtn').disabled = false;
+  }
+}
+
+async function startStream() {
+  log('Starting WebRTC stream...');
+  document.getElementById('streamBtn').disabled = true;
+  document.getElementById('status').textContent = 'Connecting...';
+
+  try {
+    // Create RTCPeerConnection
+    peerConnection = new RTCPeerConnection({
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' }
+      ]
+    });
+
+    // Handle incoming tracks (video)
+    peerConnection.ontrack = (event) => {
+      log(`Received track: ${event.track.kind}`, 'success');
+      if (event.track.kind === 'video') {
+        const videoEl = document.getElementById('avatarVideo');
+        videoEl.srcObject = event.streams[0];
+        videoEl.onloadedmetadata = () => {
+          videoEl.play().catch(e => log(`Play error: ${e.message}`, 'error'));
+        };
+        document.getElementById('status').textContent = 'Streaming!';
+      }
+    };
+
+    // Handle ICE candidates
+    peerConnection.onicecandidate = (event) => {
+      if (event.candidate) {
+        log(`ICE candidate: ${event.candidate.candidate.slice(0, 50)}...`, 'info');
+      } else {
+        log('ICE gathering complete', 'success');
+      }
+    };
+
+    peerConnection.onconnectionstatechange = () => {
+      log(`Connection state: ${peerConnection.connectionState}`, 'info');
+      if (peerConnection.connectionState === 'connected') {
+        document.getElementById('speakBtn').disabled = false;
+        document.getElementById('status').textContent = 'Connected & Ready!';
+      } else if (peerConnection.connectionState === 'failed') {
+        log('Connection failed!', 'error');
+        document.getElementById('status').textContent = 'Connection failed';
+      }
+    };
+
+    // Create data channel for sending audio/text
+    dataChannel = peerConnection.createDataChannel('audio');
+    dataChannel.onopen = () => log('Data channel open', 'success');
+    dataChannel.onmessage = (e) => log(`Data channel: ${e.data}`, 'info');
+
+    // Create offer
+    const offer = await peerConnection.createOffer();
+    await peerConnection.setLocalDescription(offer);
+
+    // Send offer to LiveAvatar (this would typically go through their signaling server)
+    // For now, we'll need to check their docs for the exact signaling flow
+    log('Offer created - need signaling server URL', 'info');
+    log(`Offer SDP: ${offer.sdp.slice(0, 100)}...`, 'info');
+
+    // TODO: Send offer to LiveAvatar's signaling endpoint
+    // This requires their WebSocket or REST signaling endpoint
+
+  } catch (err) {
+    log(`Error starting stream: ${err.message}`, 'error');
+    document.getElementById('streamBtn').disabled = false;
+  }
+}
+
+async function speakText() {
+  const text = document.getElementById('textInput').value;
+  if (!text) {
+    log('Please enter text to speak', 'error');
+    return;
+  }
+
+  log(`Speaking: "${text.slice(0, 50)}..."`);
+
+  // In CUSTOM mode, we need to:
+  // 1. Convert text to audio (use ElevenLabs or browser TTS)
+  // 2. Send audio via WebRTC data channel or track
+  // 3. LiveAvatar streams back lip-synced video
+
+  // For testing, let's try browser TTS first
+  if ('speechSynthesis' in window) {
+    const utterance = new SpeechSynthesisUtterance(text);
+
+    // Create audio context to capture TTS audio
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const destination = audioCtx.createMediaStreamDestination();
+
+    // Note: speechSynthesis can't be directly captured to WebRTC
+    // In production, you'd use ElevenLabs API like D-ID does
+
+    utterance.onend = () => log('TTS finished', 'success');
+    utterance.onerror = (e) => log(`TTS error: ${e.error}`, 'error');
+
+    speechSynthesis.speak(utterance);
+    log('Using browser TTS (audio won\'t sync with avatar yet)', 'info');
+  } else {
+    log('Browser TTS not supported', 'error');
+  }
+}
+
+function stopSession() {
+  log('Stopping session...');
+
+  if (dataChannel) {
+    dataChannel.close();
+    dataChannel = null;
+  }
+
+  if (peerConnection) {
+    peerConnection.close();
+    peerConnection = null;
+  }
+
+  sessionId = null;
+  sessionToken = null;
+
+  document.getElementById('avatarVideo').srcObject = null;
+  document.getElementById('streamBtn').disabled = false;
+  document.getElementById('speakBtn').disabled = true;
+  document.getElementById('stopBtn').disabled = true;
+  document.getElementById('createBtn').disabled = false;
+  document.getElementById('status').textContent = 'Session stopped';
+
+  log('Session stopped', 'info');
+}
+
+// Load avatars on page load
+window.addEventListener('load', () => {
+  log('LiveAvatar Test Page loaded', 'success');
+  log('API Key configured (ends with: ' + LIVEAVATAR_API_KEY.slice(-8) + ')', 'info');
+});
+</script>
+</body>
+</html>
