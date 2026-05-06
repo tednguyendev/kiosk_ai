@@ -84,29 +84,97 @@ const WHITE = "#FFFFFF";
 
 const MALL_NAME = "Kopitiam Food Court at Tan Tock Seng Hospital";
 const BRANDS = [
-  { stall: 1, brand: "Kopi Kiosk", cuisine: "Drinks & Desserts", halal: false, signature: "Kopitiam Signature Breakfast Set", desc: "Traditional kopi/teh, Yakult Juices, Ice Spin series, Super Saver Bao set. Breakfast set $3 (union member before 11am)." },
-  { stall: 1, brand: "Ann Chin Popiah", cuisine: "Popiah (Michelin Guide)", halal: false, signature: "Popiah", desc: "Founded 1958. Famous for thin, fragrant, chewy popiah skin. Heritage recipe." },
-  { stall: 2, brand: "Bread Junction", cuisine: "Bread & Bakery", halal: true, signature: "Fresh Bread", desc: "Muslim-friendly bakery with fresh bread and pastries." },
-  { stall: 3, brand: "Kallang Airport Wanton Mee", cuisine: "Wanton Noodle", halal: false, signature: "Wanton Noodle", desc: "Recipe from hawker selling since 1960. Delicious Char Siew, piquant chilli sauce, crispy pork lard, hand-wrapped wantons." },
-  { stall: 4, brand: "Teochew Pig Organ Soup & Braised", cuisine: "Teochew Cuisine", halal: false, signature: "Salted Vegetable Pig's Organ Soup", desc: "Authentic Teochew flavours. Must-tries: Pig's Organ Soup, Teochew noodles, Chaoshan braised meat." },
-  { stall: 5, brand: "Yuan Wei Su Yu", cuisine: "Vegetarian", halal: false, signature: "Vegetarian Set Meal", desc: "Healthy plant-based eating. Low Oil, Low Salt, No MSG, fresh ingredients." },
-  { stall: 6, brand: "Ying Jia Steamed Fish", cuisine: "Steamed Fish", halal: false, signature: "HK Steamed Seabass", desc: "Recipe from hotel chef (20 years). Known for signature garlic sauce. Also: Cai Pu Steamed Seabass, Bean Sauce Seabass." },
-  { stall: 7, brand: "Xiang Chi Mian", cuisine: "Bak Chor Mee", halal: false, signature: "Bak Chor Mee", desc: "Authentic Singapore hawker Bak Chor Mee. Sambal chilli, black vinegar, crispy pork lard. Pork slices, liver, meatball, minced meat, braised shiitake." },
-  { stall: 8, brand: "He Jia Econ Rice & Porridge", cuisine: "Economical Rice", halal: false, signature: "Sweet and Sour Chicken", desc: "Established 2011. Over 10 dishes daily. Also: Spicy Sambal Prawns, Braised Tofu." },
-  { stall: 9, brand: "Yuan Wei Thai Cuisine", cuisine: "Thai", halal: false, signature: "Tom Yum Soup", desc: "Prepared by experienced Thai chefs. Also: stir-fried rice noodles, basil minced pork." },
-  { stall: 10, brand: "Bu Tang Wang Pepper Soup", cuisine: "Pepper Soup", halal: false, signature: "White Pepper Chicken Soup", desc: "Hearty pepper soups. Also: ABC Soup, Lotus Root Soup, Fish Maw Chicken, Black Chicken Soup." },
-  { stall: 11, brand: "King Grouper Fish Soup", cuisine: "Fish Soup", halal: false, signature: "Teochew Style Grouper", desc: "Own fish farm in Changi. Giant Grouper 12kg+, high collagen. SFA Farm-To-Table recognition. Also: Red Grouper Fish Soup, Seafood Soup." },
-  { stall: 12, brand: "Chinatown HK Roast", cuisine: "HK Roast Meat", halal: false, signature: "Famous 3 Roast Set Meal", desc: "Char Siew, Roast Duck, Roast Pork. Also: Duck rice, Wanton Noodles, Braised Chicken Feet." },
-  { stall: 13, brand: "Kakak Handmade Noodles", cuisine: "Ban Mian", halal: true, signature: "Handmade Ban Mian", desc: "Muslim-friendly handmade noodles." },
-  { stall: 14, brand: "Cinta Hainanese Chicken Rice", cuisine: "Chicken Rice", halal: true, signature: "Hainanese Chicken Rice", desc: "Muslim-friendly Hainanese chicken rice." },
-  { stall: 15, brand: "Monster Chili Mala Hot Pot", cuisine: "Mala Hotpot", halal: true, signature: "Mala Hot Pot", desc: "Singapore's first halal Mala hotpot (est. 2014). Own secret Mala Paste. Customizable spice levels. Also: Mala Soup, Malatang, Mala Noodle." },
-  { stall: 16, brand: "Beradik Western", cuisine: "Western Food", halal: true, signature: "Fish & Chips", desc: "Muslim-friendly Western food. Also: Grilled Beef Steak, Mixed Grill, Aglio Olio, Lamb Chop, Spring Chicken." },
-  { stall: 17, brand: "Pak Lum Local Delights", cuisine: "Local Hawker", halal: true, signature: "Char Kway Teow", desc: "Smoky CKT, crispy Oyster Omelette, charred Carrot Cake. Wok hei perfection. Also: Hokkien Mee, Mee Goreng." },
-  { stall: 18, brand: "Kim Dae Bak Korean & Japanese", cuisine: "Korean & Japanese", halal: true, signature: "Saba Fish", desc: "Head chef from Ju Shin Jung (10 years). Also: Korean Army Stew, Beef Bulgogi, Kimchi Jjigae, Bibimbap." },
-  { stall: 19, brand: "Majulah Nasi Padang", cuisine: "Nasi Padang", halal: true, signature: "Nasi Lemak Beef Rendang", desc: "Muslim-friendly Nasi Padang. Also: Ayam Goreng, Ayam Masak Merah, Nasi Kuning." },
-  { stall: 20, brand: "Y&H Ayam Penyet", cuisine: "Indonesian", halal: true, signature: "Ayam Penyet", desc: "Indonesian smashed fried chicken. Also: Ikan Penyet, Ayam Bakar, Lontong, Mee Soto, Grilled Seafood Set." },
-  { stall: 21, brand: "Ampang YTF & Tangkak Beef Noodle", cuisine: "Yong Tau Foo & Beef Noodle", halal: true, signature: "Ampang Yong Tau Foo", desc: "15-year family recipe. Secret soup base and ampang sauce. Each piece carefully crafted." },
+  { stall: 1, brand: "Kopi Kiosk", cuisine: "Drinks & Desserts", halal: false, spicy: false, category: "light", signature: "Kopitiam Signature Breakfast Set", desc: "Traditional kopi/teh, Yakult Juices, Ice Spin series, Super Saver Bao set. Breakfast set $3 (union member before 11am)." },
+  { stall: 1, brand: "Ann Chin Popiah", cuisine: "Popiah (Michelin Guide)", halal: false, spicy: false, category: "local", signature: "Popiah", desc: "Founded 1958. Famous for thin, fragrant, chewy popiah skin. Heritage recipe." },
+  { stall: 2, brand: "Bread Junction", cuisine: "Bread & Bakery", halal: true, spicy: false, category: "light", signature: "Fresh Bread", desc: "Muslim-friendly bakery with fresh bread and pastries." },
+  { stall: 3, brand: "Kallang Airport Wanton Mee", cuisine: "Wanton Noodle", halal: false, spicy: false, category: "chinese", signature: "Wanton Noodle", desc: "Recipe from hawker selling since 1960. Delicious Char Siew, piquant chilli sauce, crispy pork lard, hand-wrapped wantons." },
+  { stall: 4, brand: "Teochew Pig Organ Soup & Braised", cuisine: "Teochew Cuisine", halal: false, spicy: false, category: "chinese", signature: "Salted Vegetable Pig's Organ Soup", desc: "Authentic Teochew flavours. Must-tries: Pig's Organ Soup, Teochew noodles, Chaoshan braised meat." },
+  { stall: 5, brand: "Yuan Wei Su Yu", cuisine: "Vegetarian", halal: false, spicy: false, category: "light", signature: "Vegetarian Set Meal", desc: "Healthy plant-based eating. Low Oil, Low Salt, No MSG, fresh ingredients." },
+  { stall: 6, brand: "Ying Jia Steamed Fish", cuisine: "Steamed Fish", halal: false, spicy: false, category: "chinese", signature: "HK Steamed Seabass", desc: "Recipe from hotel chef (20 years). Known for signature garlic sauce. Also: Cai Pu Steamed Seabass, Bean Sauce Seabass." },
+  { stall: 7, brand: "Xiang Chi Mian", cuisine: "Bak Chor Mee", halal: false, spicy: true, category: "local", signature: "Bak Chor Mee", desc: "Authentic Singapore hawker Bak Chor Mee. Sambal chilli, black vinegar, crispy pork lard. Pork slices, liver, meatball, minced meat, braised shiitake." },
+  { stall: 8, brand: "He Jia Econ Rice & Porridge", cuisine: "Economical Rice", halal: false, spicy: true, category: "local", signature: "Sweet and Sour Chicken", desc: "Established 2011. Over 10 dishes daily. Also: Spicy Sambal Prawns, Braised Tofu." },
+  { stall: 9, brand: "Yuan Wei Thai Cuisine", cuisine: "Thai", halal: false, spicy: true, category: "fusion", signature: "Tom Yum Soup", desc: "Prepared by experienced Thai chefs. Also: stir-fried rice noodles, basil minced pork." },
+  { stall: 10, brand: "Bu Tang Wang Pepper Soup", cuisine: "Pepper Soup", halal: false, spicy: true, category: "chinese", signature: "White Pepper Chicken Soup", desc: "Hearty pepper soups. Also: ABC Soup, Lotus Root Soup, Fish Maw Chicken, Black Chicken Soup." },
+  { stall: 11, brand: "King Grouper Fish Soup", cuisine: "Fish Soup", halal: false, spicy: false, category: "chinese", signature: "Teochew Style Grouper", desc: "Own fish farm in Changi. Giant Grouper 12kg+, high collagen. SFA Farm-To-Table recognition. Also: Red Grouper Fish Soup, Seafood Soup." },
+  { stall: 12, brand: "Chinatown HK Roast", cuisine: "HK Roast Meat", halal: false, spicy: false, category: "chinese", signature: "Famous 3 Roast Set Meal", desc: "Char Siew, Roast Duck, Roast Pork. Also: Duck rice, Wanton Noodles, Braised Chicken Feet." },
+  { stall: 13, brand: "Kakak Handmade Noodles", cuisine: "Ban Mian", halal: true, spicy: false, category: "chinese", signature: "Handmade Ban Mian", desc: "Muslim-friendly handmade noodles." },
+  { stall: 14, brand: "Cinta Hainanese Chicken Rice", cuisine: "Chicken Rice", halal: true, spicy: false, category: "local", signature: "Hainanese Chicken Rice", desc: "Muslim-friendly Hainanese chicken rice." },
+  { stall: 15, brand: "Monster Chili Mala Hot Pot", cuisine: "Mala Hotpot", halal: true, spicy: true, category: "fusion", signature: "Mala Hot Pot", desc: "Singapore's first halal Mala hotpot (est. 2014). Own secret Mala Paste. Customizable spice levels. Also: Mala Soup, Malatang, Mala Noodle." },
+  { stall: 16, brand: "Beradik Western", cuisine: "Western Food", halal: true, spicy: false, category: "western", signature: "Fish & Chips", desc: "Muslim-friendly Western food. Also: Grilled Beef Steak, Mixed Grill, Aglio Olio, Lamb Chop, Spring Chicken." },
+  { stall: 17, brand: "Pak Lum Local Delights", cuisine: "Local Hawker", halal: true, spicy: true, category: "local", signature: "Char Kway Teow", desc: "Smoky CKT, crispy Oyster Omelette, charred Carrot Cake. Wok hei perfection. Also: Hokkien Mee, Mee Goreng." },
+  { stall: 18, brand: "Kim Dae Bak Korean & Japanese", cuisine: "Korean & Japanese", halal: true, spicy: true, category: "fusion", signature: "Saba Fish", desc: "Head chef from Ju Shin Jung (10 years). Also: Korean Army Stew, Beef Bulgogi, Kimchi Jjigae, Bibimbap." },
+  { stall: 19, brand: "Majulah Nasi Padang", cuisine: "Nasi Padang", halal: true, spicy: true, category: "malay", signature: "Nasi Lemak Beef Rendang", desc: "Muslim-friendly Nasi Padang. Also: Ayam Goreng, Ayam Masak Merah, Nasi Kuning." },
+  { stall: 20, brand: "Y&H Ayam Penyet", cuisine: "Indonesian", halal: true, spicy: true, category: "malay", signature: "Ayam Penyet", desc: "Indonesian smashed fried chicken. Also: Ikan Penyet, Ayam Bakar, Lontong, Mee Soto, Grilled Seafood Set." },
+  { stall: 21, brand: "Ampang YTF & Tangkak Beef Noodle", cuisine: "Yong Tau Foo & Beef Noodle", halal: true, spicy: true, category: "chinese", signature: "Ampang Yong Tau Foo", desc: "15-year family recipe. Secret soup base and ampang sauce. Each piece carefully crafted." },
 ];
+
+const CATEGORY_LABELS = {
+  chinese: "Chinese",
+  local: "Local Singapore",
+  malay: "Malay & Indonesian",
+  western: "Western",
+  fusion: "Asian Fusion",
+  light: "Light & Healthy",
+};
+
+const CATEGORY_LABELS_ZH = {
+  chinese: "中餐",
+  local: "本地新加坡",
+  malay: "马来 & 印尼",
+  western: "西餐",
+  fusion: "亚洲融合",
+  light: "清淡健康",
+};
+
+function getCategoryLabel(key, lang) {
+  if (lang === 'zh') return CATEGORY_LABELS_ZH[key] || CATEGORY_LABELS[key] || key;
+  return CATEGORY_LABELS[key] || key;
+}
+
+function parseFiltersFromText(text) {
+  const lower = text.toLowerCase();
+  const filters = {};
+  if (/\bhalal\b/.test(lower)) filters.halal = "halal";
+  else if (/\b(non[- ]?halal|not halal|no halal)\b/.test(lower)) filters.halal = "non-halal";
+  // Language detection
+  if (/[\u4e00-\u9fff]/.test(text) || /\b(chinese|zhongwen|中文|华文|华语|普通话)\b/.test(lower)) {
+    filters.language = "zh";
+  } else if (/\b(english|英文|英语)\b/.test(lower)) {
+    filters.language = "en";
+  }
+  return filters;
+}
+
+function buildSystemPrompt(activeFilters) {
+  let prompt = `You are Kimberly, AI concierge at ${MALL_NAME}. There are 21 stalls.
+IMPORTANT: Always recommend exactly ONE stall and ONE dish. Never suggest multiple stalls or multiple dishes. Pick the single best match for what the person wants.
+When recommending, always mention the stall number (e.g. "Stall 5").
+ALWAYS make a recommendation — never just ask a clarifying question. Even if the request is vague (e.g. "food stores", "what do you have"), pick your top recommendation and offer it.
+For health-related requests (gastric, sore throat, flu, post-surgery), recommend light and gentle options like porridge (Stall 8), vegetarian (Stall 5), or soup (Stall 10/11). Avoid heavy or rich dishes like organ meats.
+Halal rule: pork, lard, char siew, bak kut teh, bak chor mee, pig organ, roast pork, wanton (with pork), and alcohol are never halal. If the user asks for something contradictory like "halal pork", "halal bak kut teh", or "halal char siew", politely point out that pork is not halal and suggest a genuinely halal alternative (e.g. halal chicken rice at Stall 14, beef rendang at Stall 19, ayam penyet at Stall 20). Never pretend a non-halal dish is halal.
+Be friendly, warm, and conversational. Always respond in 4-6 sentences — never fewer than 4.
+Reply in plain text only. Do not use markdown, asterisks, bold, italics, bullet points, or any formatting symbols — the text is spoken aloud.`;
+
+  if (activeFilters.halal !== "all" || activeFilters.language !== "en") {
+    prompt += "\n\nCURRENT ACTIVE FILTERS — ONLY recommend stalls that match ALL of these:";
+    if (activeFilters.halal === "halal") prompt += "\n- Halal: YES (only halal-certified stalls)";
+    if (activeFilters.halal === "non-halal") prompt += "\n- Halal: NO (only non-halal stalls)";
+    if (activeFilters.language === 'zh') prompt += "\n- Language: Chinese (用户说中文，你必须用中文回复)";
+    prompt += "\nIf no stall matches ALL filters, politely say so and suggest the closest match.";
+  }
+
+  // Language instruction — always include
+  if (activeFilters.language === 'zh') {
+    prompt += "\n\nIMPORTANT: The user is speaking Chinese. You MUST respond entirely in Chinese (中文). Use natural, conversational Chinese. Always mention stall numbers (e.g. '第5档').";
+  } else {
+    prompt += "\n\nRespond in English.";
+  }
+
+  prompt += "\n\nHere is the stall directory:\n" + BRANDS.map(b =>
+    `Stall ${b.stall}: ${b.brand} (${b.cuisine})${b.halal ? ' [Halal]' : ''} [${getCategoryLabel(b.category, activeFilters.language)}] - ${b.signature}. ${b.desc}`
+  ).join('\n');
+  return prompt;
+}
 
 // ─── Topic filter ───
 
@@ -143,7 +211,7 @@ async function transcribeAudio(audioBlob) {
   const formData = new FormData();
   formData.append('file', audioBlob, 'audio.webm');
   formData.append('model', 'whisper-1');
-  formData.append('language', 'en');      // lock to English — prevents JP/other hallucination
+  // language auto-detected by Whisper — supports English, Chinese, etc.
   formData.append('temperature', '0');    // deterministic, reduces invented text
   formData.append('prompt', 'Food court customer asking about stalls, dishes, halal options.');
   formData.append('response_format', 'verbose_json'); // need segments for confidence scoring
@@ -172,6 +240,7 @@ async function transcribeAudio(audioBlob) {
     : 0;
   return {
     text: (data.text || '').trim(),
+    language: data.language || 'en',
     noSpeechProb,
     avgLogprob,
   };
@@ -196,15 +265,22 @@ const WHISPER_HALLUCINATION_EXACT = [
   'you', 'thank you', 'thanks', 'bye', 'okay', 'ok',
   '.', '...', 'music', '[music]', '(music)', 'applause', '[applause]',
 ];
-function isHallucination(text) {
+function isHallucination(text, detectedLang) {
   if (!text) return true;
+  // Allow Chinese / non-ASCII if Whisper detected Chinese
+  const isChinese = detectedLang === 'zh' || detectedLang === 'zh-cn' || detectedLang === 'zh-tw' || /[\u4e00-\u9fff]/.test(text);
+  if (isChinese) {
+    if (text.trim().length === 0) return true;
+    if (/\b(?:https?:\/\/|www\.|\.com|\.org|\.net|\.io)\b/i.test(text)) return true;
+    return false;
+  }
   const norm = text.toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
   if (norm.length < 2) return true;
   if (WHISPER_HALLUCINATION_EXACT.includes(norm)) return true;
   if (WHISPER_HALLUCINATION_SUBSTRINGS.some(sub => norm.includes(sub))) return true;
   // URLs or domain names — food-court customers don't say these aloud
   if (/\b(?:https?:\/\/|www\.|\.com|\.org|\.net|\.io)\b/i.test(text)) return true;
-  // Any non-ASCII response when we asked for English = hallucination
+  // Non-ASCII in English context = likely hallucination
   if (/[^\x00-\x7F]/.test(text)) return true;
   return false;
 }
@@ -361,12 +437,13 @@ function useVoiceActivity({ enabled, paused, onUtterance, onRejected }) {
           }
           setIsTranscribing(true);
           try {
-            const { text, noSpeechProb, avgLogprob } = await transcribeAudio(blob);
+            const { text, language, noSpeechProb, avgLogprob } = await transcribeAudio(blob);
             const clean = (text || '').trim();
-            console.log('[VAD] Whisper:', JSON.stringify(clean), 'no_speech:', noSpeechProb.toFixed(2), 'logprob:', avgLogprob.toFixed(2));
+            const detectedLang = language || 'en';
+            console.log('[VAD] Whisper:', JSON.stringify(clean), 'lang:', detectedLang, 'no_speech:', noSpeechProb.toFixed(2), 'logprob:', avgLogprob.toFixed(2));
             const lowConfidence = noSpeechProb > WHISPER_NO_SPEECH_THRESHOLD || avgLogprob < WHISPER_LOGPROB_THRESHOLD;
-            if (clean && !isHallucination(clean) && !lowConfidence && onUtteranceRef.current) {
-              onUtteranceRef.current(clean);
+            if (clean && !isHallucination(clean, detectedLang) && !lowConfidence && onUtteranceRef.current) {
+              onUtteranceRef.current(clean, detectedLang);
             } else {
               const reason = !clean ? 'empty' : lowConfidence ? 'low-confidence' : 'hallucination';
               console.log('[VAD] rejected (' + reason + '):', JSON.stringify(clean));
@@ -450,19 +527,9 @@ const ICONS = {
 
 // ─── Gemini LLM ───
 
-const SYSTEM_PROMPT = `You are Kimberly, AI concierge at ${MALL_NAME}. There are 21 stalls.
-IMPORTANT: Always recommend exactly ONE stall and ONE dish. Never suggest multiple stalls or multiple dishes. Pick the single best match for what the person wants.
-When recommending, always mention the stall number (e.g. "Stall 5").
-ALWAYS make a recommendation — never just ask a clarifying question. Even if the request is vague (e.g. "food stores", "what do you have"), pick your top recommendation and offer it.
-For health-related requests (gastric, sore throat, flu, post-surgery), recommend light and gentle options like porridge (Stall 8), vegetarian (Stall 5), or soup (Stall 10/11). Avoid heavy or rich dishes like organ meats.
-Halal rule: pork, lard, char siew, bak kut teh, bak chor mee, pig organ, roast pork, wanton (with pork), and alcohol are never halal. If the user asks for something contradictory like "halal pork", "halal bak kut teh", or "halal char siew", politely point out that pork is not halal and suggest a genuinely halal alternative (e.g. halal chicken rice at Stall 14, beef rendang at Stall 19, ayam penyet at Stall 20). Never pretend a non-halal dish is halal.
-Be friendly, warm, and conversational. Always respond in 4-6 sentences — never fewer than 4.
-Reply in plain text only. Do not use markdown, asterisks, bold, italics, bullet points, or any formatting symbols — the text is spoken aloud.
-Here is the stall directory:\n` + BRANDS.map(b =>
-  `Stall ${b.stall}: ${b.brand} (${b.cuisine})${b.halal ? ' [Halal]' : ''} - ${b.signature}. ${b.desc}`
-).join('\n');
+// SYSTEM_PROMPT is now dynamic via buildSystemPrompt(activeFilters)
 
-async function callGemini(conversationHistory) {
+async function callGemini(conversationHistory, activeFilters) {
   const GEMINI_API_KEY = window.__CONFIG.GEMINI_API_KEY;
   const GEMINI_MODEL = window.__CONFIG.GEMINI_MODEL;
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
@@ -476,7 +543,7 @@ async function callGemini(conversationHistory) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+      system_instruction: { parts: [{ text: buildSystemPrompt(activeFilters || { halal: "all", language: "en" }) }] },
       contents,
     })
   });
@@ -508,6 +575,9 @@ function App() {
   const [filtered, setFiltered] = useState(false);
   const [recommendations, setRecommendations] = useState([]);
   const [rejectionNote, setRejectionNote] = useState(null);
+  // ── Filter state (bidirectional sync with AI) ──
+  const [activeFilters, setActiveFilters] = useState({ halal: "all", language: "en" });
+  const activeFiltersRef = useRef({ halal: "all", language: "en" });
   const videoRef = useRef(null);
   const agentRef = useRef(null);
   const chatEndRef = useRef(null);
@@ -535,10 +605,26 @@ function App() {
     return ordered.map(s => BRANDS.find(b => b.stall === s)).filter(Boolean);
   }
 
+  // Apply active filters to BRANDS
+  function getFilteredBrands(filters) {
+    return BRANDS.filter(b => {
+      if (filters.halal === "halal" && !b.halal) return false;
+      if (filters.halal === "non-halal" && b.halal) return false;
+      return true;
+    });
+  }
+
   // Auto-scroll chat to bottom
   useEffect(() => {
     if (chatEndRef.current) chatEndRef.current.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
+
+  // Show all stalls on startup so users can browse immediately
+  useEffect(() => {
+    if (started) {
+      setRecommendations(getFilteredBrands(activeFiltersRef.current));
+    }
+  }, [started]);
 
   // Connect D-ID only after user clicks Start
   useEffect(() => {
@@ -587,7 +673,10 @@ function App() {
                 } else if (!userSpokeFirstRef.current) {
                   greetingTimeoutRef.current = setTimeout(() => {
                     if (agentRef.current && !userSpokeFirstRef.current) {
-                      agentRef.current.speak({ type: 'text', input: 'Hello! I am Kimberly, your AI concierge here at Kopitiam. What are you in the mood for today?' }).catch(() => {});
+                      const greetingText = activeFiltersRef.current.language === 'zh'
+                        ? '你好！我是Kimberly，Kopitiam的AI礼宾。今天想吃点什么呢？'
+                        : 'Hello! I am Kimberly, your AI concierge here at Kopitiam. What are you in the mood for today?';
+                      agentRef.current.speak({ type: 'text', input: greetingText }).catch(() => {});
                     }
                   }, 500);
                 } else {
@@ -677,8 +766,15 @@ function App() {
 
   const sendToAgentRef = useRef(null);
 
-  const handleUtterance = useCallback((text) => {
+  const handleUtterance = useCallback((text, detectedLang) => {
     userSpokeFirstRef.current = true;
+    // Auto-detect language from Whisper
+    if (detectedLang && (detectedLang === 'zh' || detectedLang === 'zh-cn' || detectedLang === 'zh-tw' || detectedLang === 'cmn')) {
+      const next = { ...activeFiltersRef.current, language: 'zh' };
+      setActiveFilters(next);
+      activeFiltersRef.current = next;
+      console.log('[Filters] language auto-detected: zh');
+    }
     if (greetingTimeoutRef.current) {
       clearTimeout(greetingTimeoutRef.current);
       greetingTimeoutRef.current = null;
@@ -687,9 +783,12 @@ function App() {
   }, []);
 
   const handleRejected = useCallback((reason) => {
-    const msg = reason === 'error' ? "Couldn't reach Whisper — try again?"
-              : reason === 'empty' ? "Didn't catch that — try again?"
-              : "Hmm, didn't catch that — try again?";
+    const isZh = activeFiltersRef.current.language === 'zh';
+    const msg = reason === 'error'
+      ? (isZh ? '无法连接语音识别 — 请重试？' : "Couldn't reach Whisper — try again?")
+      : reason === 'empty'
+        ? (isZh ? '没有听清楚 — 请重试？' : "Didn't catch that — try again?")
+        : (isZh ? '嗯，没有听清楚 — 请重试？' : "Hmm, didn't catch that — try again?");
     setRejectionNote(msg);
     setTimeout(() => setRejectionNote(null), 3500);
   }, []);
@@ -732,18 +831,38 @@ function App() {
       setFiltered(true);
       return;
     }
+
+    // ── Auto-detect filters from user voice ──
+    const detected = parseFiltersFromText(text);
+    const currentFilters = activeFiltersRef.current;
+    const newFilters = { ...currentFilters };
+    let filtersChanged = false;
+    if (detected.halal) { newFilters.halal = detected.halal; filtersChanged = true; }
+    if (detected.language) { newFilters.language = detected.language; filtersChanged = true; }
+    if (filtersChanged) {
+      setActiveFilters(newFilters);
+      activeFiltersRef.current = newFilters;
+      console.log('[Filters] voice-detected:', JSON.stringify(newFilters));
+    }
+
     setRecommendations([]);
     setLoading(true);
     try {
       // Build conversation history for Gemini
       const history = [...messages, userMsg].filter(m => !m.filtered);
       perf.geminiStart = performance.now();
-      const reply = await callGemini(history);
+      const reply = await callGemini(history, newFilters);
       perf.geminiEnd = performance.now();
       console.log('[PERF] Gemini:', ms(perf.geminiStart, perf.geminiEnd));
       const assistantMsg = { role: 'assistant', content: reply };
       setMessages(prev => [...prev, assistantMsg]);
-      setRecommendations(extractRecommendations(reply));
+      // AI recommendations + filtered results
+      const aiRecs = extractRecommendations(reply);
+      const filteredResults = getFilteredBrands(newFilters);
+      // Merge: AI recs first, then filtered results that aren't already in AI recs
+      const seen = new Set(aiRecs.map(b => b.stall));
+      const merged = [...aiRecs, ...filteredResults.filter(b => !seen.has(b.stall))];
+      setRecommendations(merged);
       if (agentRef.current && didConnectedRef.current) {
         setLoading(false);
         perf.speakCall = performance.now();
@@ -774,6 +893,7 @@ function App() {
         messagesCount: messages.length,
         lastMessage: messages[messages.length - 1],
         perf: { ...perf },
+        activeFilters: activeFiltersRef.current,
       }),
       markUserSpokeFirst: () => { userSpokeFirstRef.current = true; },
       // Simulates D-ID's connected event firing — flips state AND ref, like the real onConnectionStateChange
@@ -898,7 +1018,10 @@ function App() {
                 padding: "24px 32px", maxWidth: "70%",
                 fontSize: 32, lineHeight: "42px", color: "#000",
               }}>
-                Hello! I'm Kimberly, your AI concierge here at Kopitiam, Tan Tock Seng Hospital. We have 21 food stalls with local favourites, halal options, and more. What are you in the mood for?
+                {activeFilters.language === 'zh'
+                  ? '你好！我是Kimberly，陈笃生医院Kopitiam美食阁的AI礼宾。我们有21个美食摊位，包括本地美食和清真选项等。今天想吃点什么呢？'
+                  : "Hello! I'm Kimberly, your AI concierge here at Kopitiam, Tan Tock Seng Hospital. We have 21 food stalls with local favourites, halal options, and more. What are you in the mood for?"
+                }
               </div>
             </div>
           )}
@@ -944,7 +1067,7 @@ function App() {
                 fontSize: 32, lineHeight: "42px", color: RED,
                 border: `2px dashed ${RED}`,
               }}>
-                Listening...
+                {activeFilters.language === 'zh' ? '正在聆听...' : 'Listening...'}
               </div>
             </div>
           )}
@@ -960,7 +1083,7 @@ function App() {
                 fontSize: 32, lineHeight: "42px", color: "#888",
                 border: `2px dashed #bbb`,
               }}>
-                <span style={{ animation: "pulse 1.5s infinite" }}>Transcribing...</span>
+                <span style={{ animation: "pulse 1.5s infinite" }}>{activeFilters.language === 'zh' ? '正在转录...' : 'Transcribing...'}</span>
               </div>
             </div>
           )}
@@ -976,7 +1099,10 @@ function App() {
                 fontSize: 32, lineHeight: "42px", color: "#666",
               }}>
                 <span style={{ animation: "pulse 1.5s infinite" }}>
-                  {didConnected ? "Thinking..." : "Thinking... (connecting avatar)"}
+                  {activeFilters.language === 'zh'
+                    ? (didConnected ? '正在思考...' : '正在思考... (连接虚拟形象)')
+                    : (didConnected ? "Thinking..." : "Thinking... (connecting avatar)")
+                  }
                 </span>
               </div>
             </div>
@@ -1024,11 +1150,16 @@ function App() {
             fontSize: 36, fontWeight: 600,
             color: userSpeaking ? RED : (speaking || loading) ? "#888" : DARK_TEXT,
           }}>
-            {!isListening ? "Starting mic…"
-              : speaking ? "Kimberly is speaking…"
-              : loading ? "Thinking…"
-              : userSpeaking ? "Listening…"
-              : "Just speak — I'm listening"}
+            {!isListening
+              ? (activeFilters.language === 'zh' ? '启动麦克风…' : 'Starting mic…')
+              : speaking
+                ? (activeFilters.language === 'zh' ? 'Kimberly正在说话…' : 'Kimberly is speaking…')
+                : loading
+                  ? (activeFilters.language === 'zh' ? '正在思考…' : 'Thinking…')
+                  : userSpeaking
+                    ? (activeFilters.language === 'zh' ? '正在聆听…' : 'Listening…')
+                    : (activeFilters.language === 'zh' ? '请说话 — 我在听' : "Just speak — I'm listening")
+            }
           </span>
         </div>
         {!didConnected && (
@@ -1037,54 +1168,146 @@ function App() {
       </div>
 
 
+      {/* ── Filter Bar ── */}
+      <div style={{
+        position: "absolute", left: 400, top: 370, width: 750,
+        padding: "0",
+        display: "flex", flexDirection: "column", gap: 12,
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 32, fontWeight: 600, color: DARK_TEXT }}>{activeFilters.language === 'zh' ? '筛选:' : 'Filters:'}</span>
+
+          {/* Halal filter */}
+          {[
+            { key: "all", label: activeFilters.language === 'zh' ? '全部' : 'All' },
+            { key: "halal", label: activeFilters.language === 'zh' ? '清真' : 'Halal' },
+            { key: "non-halal", label: activeFilters.language === 'zh' ? '非清真' : 'Non-Halal' },
+          ].map(opt => (
+            <button key={opt.key} onClick={() => {
+              const next = { ...activeFiltersRef.current, halal: opt.key };
+              setActiveFilters(next);
+              activeFiltersRef.current = next;
+              // Refresh displayed stalls immediately
+              const filtered = getFilteredBrands(next);
+              const aiRecs = recommendations.filter(r => {
+                const match = filtered.find(f => f.stall === r.stall);
+                return !!match;
+              });
+              setRecommendations([...aiRecs, ...filtered.filter(f => !aiRecs.find(r => r.stall === f.stall))]);
+            }} style={{
+              padding: "12px 28px", borderRadius: 30, fontSize: 28, fontWeight: 600,
+              border: `3px solid ${activeFilters.halal === opt.key ? RED : "#ccc"}`,
+              background: activeFilters.halal === opt.key ? RED : WHITE,
+              color: activeFilters.halal === opt.key ? WHITE : DARK_TEXT,
+              cursor: "pointer", transition: "all 0.2s",
+            }}>{opt.label}</button>
+          ))}
+
+          {/* Language toggle */}
+          <div style={{ display: "flex", gap: 0, borderRadius: 30, overflow: "hidden", border: `3px solid ${RED}` }}>
+            <button onClick={() => {
+              const next = { ...activeFiltersRef.current, language: 'en' };
+              setActiveFilters(next);
+              activeFiltersRef.current = next;
+            }} style={{
+              padding: "12px 28px", fontSize: 28, fontWeight: 600,
+              background: activeFilters.language === 'en' ? RED : WHITE,
+              color: activeFilters.language === 'en' ? WHITE : DARK_TEXT,
+              border: "none", cursor: "pointer",
+            }}>English</button>
+            <button onClick={() => {
+              const next = { ...activeFiltersRef.current, language: 'zh' };
+              setActiveFilters(next);
+              activeFiltersRef.current = next;
+            }} style={{
+              padding: "12px 28px", fontSize: 28, fontWeight: 600,
+              background: activeFilters.language === 'zh' ? RED : WHITE,
+              color: activeFilters.language === 'zh' ? WHITE : DARK_TEXT,
+              border: "none", borderLeft: `3px solid ${RED}`, cursor: "pointer",
+            }}>中文</button>
+          </div>
+
+          {/* Reset filters */}
+          {(activeFilters.halal !== "all" || activeFilters.language !== "en") && (
+            <button onClick={() => {
+              const next = { halal: "all", language: "en" };
+              setActiveFilters(next);
+              activeFiltersRef.current = next;
+              const filtered = getFilteredBrands(next);
+              setRecommendations(filtered);
+            }} style={{
+              padding: "12px 28px", borderRadius: 30, fontSize: 28, fontWeight: 600,
+              border: "3px solid #888", background: "#f5f5f5", color: "#666",
+              cursor: "pointer",
+            }}>{activeFilters.language === 'zh' ? '重置' : 'Reset'}</button>
+          )}
+        </div>
+      </div>
+
       {/* ── Kimberly's Recommendation ── */}
       {recommendations.length > 0 && (
         <div style={{
-          position: "absolute", left: 0, top: 2100, width: 2160,
+          position: "absolute", left: 0, top: 2150, width: 2160,
           padding: "0 80px",
         }}>
           <div style={{
             fontWeight: 600, fontSize: 48, color: RED, marginBottom: 30,
-          }}>Kimberly's Recommendation</div>
+          }}>{activeFilters.language === 'zh' ? '美食摊位' : 'Food Stalls'}</div>
 
           <div style={{
             display: "flex", gap: 30, overflowX: "auto",
             paddingBottom: 20,
           }}>
-            {recommendations.map((brand, i) => (
-              <div key={i} style={{
-                minWidth: 580, background: WHITE,
-                borderRadius: 30, padding: "40px 36px",
-                boxShadow: "0 4px 30px rgba(0,0,0,0.1)",
-                border: `3px solid ${GOLD}`,
-                flexShrink: 0,
-              }}>
-                <div style={{
-                  display: "flex", justifyContent: "space-between", alignItems: "flex-start",
-                  marginBottom: 16,
+            {recommendations.map((brand, i) => {
+              const lastAssistantMsg = messages.filter(m => m.role === 'assistant').pop();
+              const aiStalls = lastAssistantMsg ? extractRecommendations(lastAssistantMsg.content).map(b => b.stall) : [];
+              const isAiPick = aiStalls.includes(brand.stall);
+              return (
+                <div key={i} style={{
+                  minWidth: 580, background: WHITE,
+                  borderRadius: 30, padding: "40px 36px",
+                  boxShadow: "0 4px 30px rgba(0,0,0,0.1)",
+                  border: `4px solid ${isAiPick ? GOLD : "#e0e0e0"}`,
+                  flexShrink: 0,
+                  position: "relative",
                 }}>
+                  {isAiPick && (
+                    <div style={{
+                      position: "absolute", top: -16, left: 24,
+                      background: GOLD, color: DARK_TEXT,
+                      fontSize: 22, fontWeight: 700,
+                      padding: "6px 16px", borderRadius: 12,
+                    }}>{activeFilters.language === 'zh' ? 'Kimberly推荐' : "Kimberly's Pick"}</div>
+                  )}
                   <div style={{
-                    fontWeight: 700, fontSize: 38, color: DARK_TEXT,
-                    lineHeight: "46px", flex: 1,
-                  }}>{brand.brand}</div>
+                    display: "flex", justifyContent: "space-between", alignItems: "flex-start",
+                    marginBottom: 16,
+                  }}>
+                    <div style={{
+                      fontWeight: 700, fontSize: 38, color: DARK_TEXT,
+                      lineHeight: "46px", flex: 1,
+                    }}>{brand.brand}</div>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <div style={{
+                        background: brand.halal ? "#2E7D32" : "#888",
+                        color: WHITE, fontSize: 26, fontWeight: 600,
+                        padding: "6px 18px", borderRadius: 20,
+                        whiteSpace: "nowrap",
+                      }}>{brand.halal ? "Halal" : "Non-Halal"}</div>
+                    </div>
+                  </div>
                   <div style={{
-                    background: brand.halal ? "#2E7D32" : "#888",
-                    color: WHITE, fontSize: 26, fontWeight: 600,
-                    padding: "6px 18px", borderRadius: 20,
-                    marginLeft: 16, whiteSpace: "nowrap",
-                  }}>{brand.halal ? "Halal" : "Non-Halal"}</div>
+                    fontSize: 30, color: RED, fontWeight: 600, marginBottom: 12,
+                  }}>Stall {brand.stall} · {brand.cuisine}</div>
+                  <div style={{
+                    fontSize: 30, color: "#666", fontWeight: 500, marginBottom: 12,
+                  }}>★ {brand.signature}</div>
+                  <div style={{
+                    fontSize: 28, color: "#888", lineHeight: "38px",
+                  }}>{brand.desc}</div>
                 </div>
-                <div style={{
-                  fontSize: 30, color: RED, fontWeight: 600, marginBottom: 12,
-                }}>Stall {brand.stall} · {brand.cuisine}</div>
-                <div style={{
-                  fontSize: 30, color: "#666", fontWeight: 500, marginBottom: 12,
-                }}>★ {brand.signature}</div>
-                <div style={{
-                  fontSize: 28, color: "#888", lineHeight: "38px",
-                }}>{brand.desc}</div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -1107,9 +1330,14 @@ function App() {
         setRecommendations([]);
         setFiltered(false);
         setLoading(false);
+        const resetFilters = { halal: "all", language: "en" };
+        setActiveFilters(resetFilters);
+        activeFiltersRef.current = resetFilters;
         userSpokeFirstRef.current = false;
         pendingSpeakRef.current = null;
-        const greeting = 'Hello! I am Kimberly, your AI concierge here at Kopitiam. What are you in the mood for today?';
+        const greeting = activeFiltersRef.current.language === 'zh'
+          ? '你好！我是Kimberly，Kopitiam的AI礼宾。今天想吃点什么呢？'
+          : 'Hello! I am Kimberly, your AI concierge here at Kopitiam. What are you in the mood for today?';
         if (agentRef.current && didConnected) {
           agentRef.current.speak({ type: 'text', input: greeting }).catch(() => {});
         } else {
