@@ -585,6 +585,7 @@ function App() {
   const userSpokeFirstRef = useRef(false);
   const greetingTimeoutRef = useRef(null);
   const pendingSpeakRef = useRef(null);
+  const speakLockRef = useRef(false);
   // Mirror anamConnected into a ref so sendToAgent doesn't read a stale value from its closure
   const anamConnectedRef = useRef(false);
 
@@ -690,6 +691,7 @@ function App() {
     // Cleanup on unmount
     return () => {
       cancelled = true;
+      if (greetingTimeoutRef.current) { clearTimeout(greetingTimeoutRef.current); greetingTimeoutRef.current = null; }
       if (anamClientRef.current) {
         try { anamClientRef.current.stopStreaming(); } catch (e) {}
         anamClientRef.current = null;
@@ -700,20 +702,18 @@ function App() {
   // ─── Anam speak: send text to avatar via talk() ───
   async function speakWithAnam(text) {
     if (!anamClientRef.current) return;
+    if (speakLockRef.current) { console.log('[Anam] speak locked, skipping:', text.slice(0, 40)); return; }
+    speakLockRef.current = true;
+    console.log('[Anam] speakWithAnam called:', text.slice(0, 60));
     setSpeaking(true);
     try {
       await anamClientRef.current.talk(text);
-      // talk() returns immediately; estimate speech duration (~150ms per char)
+      console.log('[Anam] talk() sent successfully');
       const duration = Math.max(2000, text.length * 150);
-      setTimeout(() => setSpeaking(false), duration);
+      setTimeout(() => { setSpeaking(false); speakLockRef.current = false; }, duration);
     } catch (err) {
       console.error('[Anam] talk error:', err);
-      // Fallback: play via browser TTS so user still hears the response
-      try {
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = activeFiltersRef.current.language === 'zh' ? 'zh-CN' : 'en-US';
-        window.speechSynthesis.speak(utterance);
-      } catch (e) {}
+      speakLockRef.current = false;
       setSpeaking(false);
     }
   }
