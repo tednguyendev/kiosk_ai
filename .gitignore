@@ -1,2 +1,8 @@
 # Local Netlify folder
 .netlify
+.playwright-mcp/
+
+# bitHuman server artifacts
+bithuman-server/avatar.imx
+bithuman-server/*.log
+bithuman-server/venv/

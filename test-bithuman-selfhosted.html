@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>bitHuman Self-Hosted Test</title>
+<style>
+  body { background:#000; color:#fff; font-family:sans-serif; display:flex; flex-direction:column; align-items:center; padding:20px; }
+  #canvas { background:#111; border-radius:12px; max-width:100%; }
+  #controls { margin-top:20px; display:flex; gap:10px; }
+  input { padding:10px; font-size:16px; border-radius:6px; border:none; width:300px; }
+  button { padding:10px 20px; font-size:16px; border-radius:6px; border:none; cursor:pointer; background:#0a84ff; color:#fff; }
+  #status { margin-top:10px; color:#aaa; font-size:14px; }
+  #fps { position:absolute; top:10px; right:10px; background:rgba(0,0,0,0.7); padding:5px 10px; border-radius:4px; font-size:12px; }
+</style>
+</head>
+<body>
+  <div style="position:relative;">
+    <canvas id="canvas" width="512" height="512"></canvas>
+    <div id="fps">0 fps</div>
+  </div>
+  <div id="status">Connecting...</div>
+  <div id="controls">
+    <input type="text" id="textInput" placeholder="Type something to speak..." value="Hello! Welcome to our restaurant!" />
+    <button id="speakBtn">Speak</button>
+  </div>
+
+<script>
+const WS_URL = 'ws://localhost:8766/ws';
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const statusEl = document.getElementById('status');
+const fpsEl = document.getElementById('fps');
+
+let ws = null;
+let reconnectTimer = null;
+let frameCount = 0;
+let lastFpsTime = performance.now();
+
+function connect() {
+  statusEl.textContent = 'Connecting...';
+  ws = new WebSocket(WS_URL);
+  ws.binaryType = 'blob';
+
+  ws.onopen = () => {
+    statusEl.textContent = 'Connected. Waiting for frames...';
+    console.log('[WS] Connected');
+  };
+
+  ws.onmessage = async (event) => {
+    if (event.data instanceof Blob) {
+      const blob = event.data;
+      const img = new Image();
+      img.onload = () => {
+        // Draw image, maintaining aspect ratio
+        const cw = canvas.width, ch = canvas.height;
+        const iw = img.width, ih = img.height;
+        const scale = Math.min(cw/iw, ch/ih);
+        const x = (cw - iw*scale)/2;
+        const y = (ch - ih*scale)/2;
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, cw, ch);
+        ctx.drawImage(img, x, y, iw*scale, ih*scale);
+        frameCount++;
+        const now = performance.now();
+        if (now - lastFpsTime >= 1000) {
+          fpsEl.textContent = `${frameCount} fps`;
+          frameCount = 0;
+          lastFpsTime = now;
+        }
+        URL.revokeObjectURL(img.src);
+      };
+      img.src = URL.createObjectURL(blob);
+    }
+  };
+
+  ws.onclose = () => {
+    statusEl.textContent = 'Disconnected. Reconnecting...';
+    console.log('[WS] Disconnected');
+    reconnectTimer = setTimeout(connect, 2000);
+  };
+
+  ws.onerror = (err) => {
+    console.error('[WS] Error:', err);
+    statusEl.textContent = 'Error. Reconnecting...';
+  };
+}
+
+connect();
+
+document.getElementById('speakBtn').addEventListener('click', () => {
+  const text = document.getElementById('textInput').value;
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ action: 'speak', text }));
+    statusEl.textContent = 'Sent: ' + text;
+  }
+});
+
+document.getElementById('textInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('speakBtn').click();
+});
+</script>
+</body>
+</html>

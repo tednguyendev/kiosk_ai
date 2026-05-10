@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kiosk AI — bitHuman Avatar Test</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0a0a0f; color: #e0e0e0;
+      min-height: 100vh; padding: 20px;
+    }
+    h1 { color: #00d4aa; margin-bottom: 8px; }
+    .subtitle { color: #888; margin-bottom: 24px; }
+    .card {
+      background: #14141f; border: 1px solid #2a2a3a;
+      border-radius: 12px; padding: 20px; margin-bottom: 20px;
+    }
+    .card h2 { color: #00d4aa; margin-bottom: 12px; font-size: 16px; }
+    .card ol, .card ul { padding-left: 20px; line-height: 1.8; }
+    .card li { color: #bbb; }
+    .card a { color: #4dabf7; }
+    .card code {
+      background: #1e1e2e; padding: 2px 6px; border-radius: 4px;
+      font-family: 'SF Mono', monospace; font-size: 13px; color: #ffd43b;
+    }
+    .config-row {
+      display: flex; gap: 12px; margin-bottom: 12px; flex-wrap: wrap;
+    }
+    .config-row input, .config-row textarea {
+      flex: 1; min-width: 200px;
+      background: #1e1e2e; border: 1px solid #3a3a4a;
+      color: #e0e0e0; padding: 10px 14px; border-radius: 8px;
+      font-size: 14px;
+    }
+    .config-row input:focus, .config-row textarea:focus {
+      outline: none; border-color: #00d4aa;
+    }
+    button {
+      background: #00d4aa; color: #0a0a0f; border: none;
+      padding: 10px 24px; border-radius: 8px; font-weight: 600;
+      cursor: pointer; font-size: 14px; transition: opacity 0.2s;
+    }
+    button:hover { opacity: 0.85; }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-secondary {
+      background: #2a2a3a; color: #e0e0e0;
+    }
+    #avatar-container {
+      width: 100%; aspect-ratio: 9/16; max-height: 70vh;
+      background: #0d0d14; border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      border: 1px dashed #3a3a4a; margin-top: 16px;
+    }
+    #avatar-container iframe {
+      width: 100%; height: 100%; border: none; border-radius: 12px;
+    }
+    #avatar-container .placeholder {
+      color: #666; font-size: 14px; text-align: center;
+    }
+    .log {
+      background: #0d0d14; border-radius: 8px; padding: 12px;
+      font-family: 'SF Mono', monospace; font-size: 12px;
+      color: #888; max-height: 200px; overflow-y: auto;
+      margin-top: 12px; white-space: pre-wrap;
+    }
+    .note {
+      background: #1a1a2e; border-left: 3px solid #ffd43b;
+      padding: 12px 16px; border-radius: 0 8px 8px 0;
+      margin: 12px 0; color: #ccc; font-size: 13px;
+    }
+    .tag {
+      display: inline-block; background: #1e3a2f;
+      color: #00d4aa; padding: 2px 8px; border-radius: 4px;
+      font-size: 11px; font-weight: 600; margin-right: 6px;
+    }
+    .tag-orange { background: #3a2a1e; color: #ffa94d; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media (max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <h1>🎭 bitHuman Avatar Test</h1>
+  <p class="subtitle">Test full-body real-time avatar from a photo — runs on CPU, kiosk-ready</p>
+
+  <div class="grid-2">
+    <div class="card">
+      <h2>📋 What bitHuman Does</h2>
+      <ul>
+        <li><span class="tag">3D</span> Pre-rendered animation model (lightweight)</li>
+        <li><span class="tag">BODY</span> Full body + custom gestures supported</li>
+        <li><span class="tag">REAL-TIME</span> 25 FPS, &lt;200ms latency</li>
+        <li><span class="tag">PHOTO</span> Build avatar from photo or video</li>
+        <li><span class="tag">KIOSK</span> Runs on Raspberry Pi (CPU only)</li>
+        <li><span class="tag-orange">WEB</span> Cloud API + LiveKit plugin</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>🚀 Setup Steps</h2>
+      <ol>
+        <li>Go to <a href="https://bithuman.ai" target="_blank">bithuman.ai</a> and sign up</li>
+        <li>Free plan: <strong>99 credits/month</strong>, no card needed</li>
+        <li>Go to <strong>Developer → API Keys</strong> → copy API Secret</li>
+        <li>Upload a photo → create an <strong>Avatar Agent</strong></li>
+        <li>Note the <strong>Agent Code</strong> (e.g., <code>abc123</code>)</li>
+        <li>Paste both below and test!</li>
+      </ol>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>⚙️ Configuration</h2>
+    <div class="config-row">
+      <input type="text" id="apiKey" placeholder="API Secret (from bithuman.ai Developer → API Keys)" />
+      <input type="text" id="agentCode" placeholder="Agent Code (e.g., abc123)" />
+    </div>
+    <div class="note">
+      <strong>CORS Note:</strong> bitHuman's REST API may block direct browser requests.
+      If the direct API call fails, use the proxy server below or test with curl.
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>🗣️ Make Avatar Speak</h2>
+    <div class="config-row">
+      <textarea id="speakText" rows="2" placeholder="Type text for the avatar to speak...">Hello! I am your kiosk AI assistant. Welcome to our restaurant!</textarea>
+    </div>
+    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+      <button onclick="speakDirect()">Speak (Direct API)</button>
+      <button class="btn-secondary" onclick="speakViaProxy()">Speak (via Local Proxy)</button>
+      <button class="btn-secondary" onclick="requestEmbedToken()">Get Embed Token</button>
+    </div>
+    <div class="log" id="log">// Logs will appear here...</div>
+  </div>
+
+  <div class="card">
+    <h2>📺 Avatar Display</h2>
+    <div id="avatar-container">
+      <div class="placeholder">
+        Avatar will render here once configured.<br>
+        Use the <strong>Get Embed Token</strong> button above to generate a web embed.
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>🔧 Local Proxy Server (Node.js)</h2>
+    <p style="color:#888; margin-bottom:8px;">If CORS blocks direct calls, run this proxy:</p>
+    <pre style="background:#0d0d14; padding:12px; border-radius:8px; overflow-x:auto;"><code style="color:#ccc;">// proxy.js — run with: node proxy.js
+const express = require('express');
+const cors = require('cors');
+const fetch = require('node-fetch');
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+app.post('/api/bithuman/:agentCode/speak', async (req, res) => {
+  const r = await fetch(`https://api.bithuman.ai/v1/agent/${req.params.agentCode}/speak`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'api-secret': req.headers['x-api-secret']
+    },
+    body: JSON.stringify(req.body)
+  });
+  const data = await r.json();
+  res.status(r.status).json(data);
+});
+
+app.listen(3456, () => console.log('Proxy on http://localhost:3456'));
+</code></pre>
+  </div>
+
+  <script>
+    const log = (msg) => {
+      const el = document.getElementById('log');
+      el.textContent += '\n[' + new Date().toLocaleTimeString() + '] ' + msg;
+      el.scrollTop = el.scrollHeight;
+    };
+
+    async function speakDirect() {
+      const apiKey = document.getElementById('apiKey').value.trim();
+      const agentCode = document.getElementById('agentCode').value.trim();
+      const text = document.getElementById('speakText').value.trim();
+
+      if (!apiKey || !agentCode) { log('❌ Missing API Key or Agent Code'); return; }
+      if (!text) { log('❌ No text to speak'); return; }
+
+      log('🔄 Calling bitHuman API directly...');
+      try {
+        const res = await fetch(`https://api.bithuman.ai/v1/agent/${agentCode}/speak`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'api-secret': apiKey
+          },
+          body: JSON.stringify({ text })
+        });
+        const data = await res.json();
+        log('✅ Response: ' + JSON.stringify(data, null, 2));
+      } catch (err) {
+        log('❌ Error: ' + err.message);
+        log('💡 Try using the Local Proxy instead (CORS issue)');
+      }
+    }
+
+    async function speakViaProxy() {
+      const apiKey = document.getElementById('apiKey').value.trim();
+      const agentCode = document.getElementById('agentCode').value.trim();
+      const text = document.getElementById('speakText').value.trim();
+
+      if (!apiKey || !agentCode) { log('❌ Missing API Key or Agent Code'); return; }
+
+      log('🔄 Calling via proxy (http://localhost:3456)...');
+      try {
+        const res = await fetch(`http://localhost:3456/api/bithuman/${agentCode}/speak`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-secret': apiKey
+          },
+          body: JSON.stringify({ text })
+        });
+        const data = await res.json();
+        log('✅ Proxy Response: ' + JSON.stringify(data, null, 2));
+      } catch (err) {
+        log('❌ Proxy Error: ' + err.message);
+        log('💡 Make sure the proxy server is running on port 3456');
+      }
+    }
+
+    async function requestEmbedToken() {
+      const apiKey = document.getElementById('apiKey').value.trim();
+      if (!apiKey) { log('❌ Missing API Key'); return; }
+
+      log('🔄 Requesting embed token...');
+      try {
+        const res = await fetch('https://api.bithuman.ai/v1/embed-tokens/request', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'api-secret': apiKey
+          },
+          body: JSON.stringify({}) // adjust payload as needed
+        });
+        const data = await res.json();
+        log('✅ Embed Token Response: ' + JSON.stringify(data, null, 2));
+
+        if (data.token || data.embed_token) {
+          const token = data.token || data.embed_token;
+          const container = document.getElementById('avatar-container');
+          container.innerHTML = `<iframe src="https://embed.bithuman.ai/?token=${token}" allow="camera; microphone"></iframe>`;
+          log('📺 Embed loaded. If URL is wrong, check bitHuman docs for correct embed format.');
+        }
+      } catch (err) {
+        log('❌ Error: ' + err.message);
+      }
+    }
+  </script>
+</body>
+</html>
