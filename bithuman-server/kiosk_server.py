@@ -3,14 +3,15 @@ bitHuman Kiosk Server
 Subclasses the built-in StreamServer to add a /speak-text endpoint
 that generates TTS and drives the local avatar for lip-sync.
 
-TTS strategy (fastest first):
-  1. macOS `say` command — local, ~100-300ms, no network
-  2. OpenAI TTS API — cloud, ~1-3s, higher quality fallback
+TTS: Microsoft Edge TTS (free, high-quality neural voices)
+  - English: en-SG-LunaNeural  (Singapore English ~ Malaysian)
+  - Chinese: zh-CN-XiaoxiaoNeural
+  - Auto-detects language from text
 
 Endpoints:
   GET  /           — Built-in HTML viewer (fullscreen MJPEG)
   GET  /stream     — MJPEG multipart video stream
-  POST /speak      — Accept audio file (MP3/WAV/OGG/FLAC/AIFF), feed to runtime
+  POST /speak      — Accept audio file, feed to runtime
   POST /speak-text — Accept JSON {text}, generate TTS, feed to runtime
   GET  /ws/audio   — WebSocket for raw PCM audio output
   GET  /health     — Health check + runtime status
@@ -18,10 +19,9 @@ Endpoints:
 
 import asyncio
 import os
-import subprocess
 import tempfile
 
-import requests
+import edge_tts
 from aiohttp import web
 from aiohttp.web_middlewares import middleware
 
@@ -44,18 +44,27 @@ async def cors_middleware(request, handler):
 
 # ─── Config ───
 API_SECRET = "dOIQCNkA6HbqHDvh5JqzKIhr1Cku48P4SzLBlXicA39XED7vdUDFPBh3lMCbt37Gy"
-OPENAI_KEY = "YOUR_OPENAI_API_KEY"
 MODEL_PATH = "avatar.imx"
 HOST = "0.0.0.0"
 PORT = 3001
 
+# Edge TTS voices
+VOICE_EN = "en-SG-LunaNeural"      # Singapore English (closest to Malaysian)
+VOICE_ZH = "zh-CN-XiaoxiaoNeural"  # Chinese (Mainland)
+
+
+def detect_language(text: str) -> str:
+    """Detect if text is Chinese or English."""
+    if any("\u4e00" <= ch <= "\u9fff" for ch in text):
+        return "zh"
+    return "en"
+
 
 class KioskServer(StreamServer):
-    """StreamServer extended with local + cloud TTS text-to-speech."""
+    """StreamServer extended with Edge TTS text-to-speech."""
 
-    def __init__(self, *args, openai_key: str = "", **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.openai_key = openai_key
 
     def create_app(self) -> web.Application:
         app = super().create_app()
@@ -123,85 +132,10 @@ document.getElementById('textInput').addEventListener('keydown', (e) => {
 </html>"""
         return web.Response(text=html, content_type="text/html")
 
-    # ─── TTS helpers ───
-
-    def _pick_say_voice(self, text: str) -> str:
-        """Pick an appropriate macOS `say` voice based on text language."""
-        # Simple heuristic: Chinese characters -> Chinese voice
-        if any("\u4e00" <= ch <= "\u9fff" for ch in text):
-            return "Ting-Ting"
-        return "Samantha"
-
-    async def _generate_tts_local(self, text: str) -> bytes:
-        """Generate TTS using macOS `say` command. Returns AIFF bytes."""
-        voice = self._pick_say_voice(text)
-        fd, tmp_path = tempfile.mkstemp(suffix=".aiff")
-        try:
-            os.close(fd)
-            proc = await asyncio.create_subprocess_exec(
-                "say", "-v", voice, "-o", tmp_path, text,
-                stdout=asyncio.subprocess.DEVNULL,
-                stderr=asyncio.subprocess.DEVNULL,
-            )
-            await asyncio.wait_for(proc.wait(), timeout=10)
-            if proc.returncode != 0:
-                raise RuntimeError(f"say exited with code {proc.returncode}")
-            with open(tmp_path, "rb") as f:
-                return f.read()
-        finally:
-            if os.path.exists(tmp_path):
-                os.unlink(tmp_path)
-
-    async def _generate_tts_openai(self, text: str) -> bytes:
-        """Generate TTS using OpenAI API. Returns MP3 bytes."""
-        resp = await asyncio.get_event_loop().run_in_executor(
-            None,
-            lambda: requests.post(
-                "https://api.openai.com/v1/audio/speech",
-                headers={
-                    "Authorization": f"Bearer {self.openai_key}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "model": "tts-1",
-                    "input": text,
-                    "voice": "alloy",
-                    "response_format": "mp3",
-                },
-                timeout=30,
-            ),
-        )
-        resp.raise_for_status()
-        return resp.content
-
-    async def _push_audio_to_runtime(self, audio_bytes: bytes, suffix: str) -> float:
-        """Decode audio bytes and push to bithuman runtime. Returns duration."""
-        fd, tmp_path = tempfile.mkstemp(suffix=suffix)
-        try:
-            os.write(fd, audio_bytes)
-            os.close(fd)
-            audio_float, sample_rate = load_audio(tmp_path, target_sr=16000)
-        finally:
-            os.unlink(tmp_path)
-
-        audio_int16 = float32_to_int16(audio_float)
-        duration = len(audio_int16) / sample_rate
-
-        # Stream audio to runtime in FPS-aligned chunks
-        chunk_size = sample_rate // 25  # 640 samples @ 16kHz
-        for i in range(0, len(audio_int16), chunk_size):
-            chunk = audio_int16[i : i + chunk_size]
-            await self._runtime.push_audio(
-                chunk.tobytes(), sample_rate, last_chunk=False
-            )
-
-        await self._runtime.flush()
-        return duration
-
     # ─── Text-to-Speech endpoint ───
 
     async def _handle_speak_text(self, request: web.Request) -> web.Response:
-        """POST /speak-text — accept JSON {text}, generate TTS, feed to runtime."""
+        """POST /speak-text — accept JSON {text}, generate Edge TTS, feed to runtime."""
         if self._runtime is None:
             return web.json_response(
                 {"error": "Runtime not initialized"}, status=503
@@ -216,44 +150,46 @@ document.getElementById('textInput').addEventListener('keydown', (e) => {
         if not text:
             return web.json_response({"error": "No text provided"}, status=400)
 
-        audio_bytes = None
-        suffix = ".mp3"
-        tts_source = "unknown"
+        # 1. Detect language and pick voice
+        lang = detect_language(text)
+        voice = VOICE_ZH if lang == "zh" else VOICE_EN
+        print(f"[TTS] lang={lang}, voice={voice}, text={text[:50]}...")
 
-        # 1. Try local macOS `say` first (fastest, ~100-300ms)
-        if os.uname().sysname == "Darwin":
-            try:
-                audio_bytes = await self._generate_tts_local(text)
-                suffix = ".aiff"
-                tts_source = "local"
-                print(f"[TTS] Local say: {text[:50]}...")
-            except Exception as e:
-                print(f"[TTS] Local say failed: {e}, falling back to OpenAI")
+        # 2. Generate TTS via Edge TTS
+        try:
+            fd, tmp_mp3 = tempfile.mkstemp(suffix=".mp3")
+            os.close(fd)
+            communicate = edge_tts.Communicate(text, voice)
+            await communicate.save(tmp_mp3)
 
-        # 2. Fall back to OpenAI TTS
-        if audio_bytes is None:
-            try:
-                audio_bytes = await self._generate_tts_openai(text)
-                suffix = ".mp3"
-                tts_source = "openai"
-                print(f"[TTS] OpenAI: {text[:50]}...")
-            except Exception as e:
-                return web.json_response(
-                    {"error": f"TTS generation failed: {e}"}, status=500
+            # 3. Load MP3 → PCM int16
+            audio_float, sample_rate = load_audio(tmp_mp3, target_sr=16000)
+            os.unlink(tmp_mp3)
+
+            audio_int16 = float32_to_int16(audio_float)
+            duration = len(audio_int16) / sample_rate
+
+            # 4. Push to runtime in FPS-aligned chunks
+            chunk_size = sample_rate // 25  # 640 samples @ 16kHz
+            for i in range(0, len(audio_int16), chunk_size):
+                chunk = audio_int16[i : i + chunk_size]
+                await self._runtime.push_audio(
+                    chunk.tobytes(), sample_rate, last_chunk=False
                 )
 
-        # 3. Push to runtime
-        try:
-            duration = await self._push_audio_to_runtime(audio_bytes, suffix)
+            await self._runtime.flush()
+
             return web.json_response({
                 "status": "ok",
                 "duration_seconds": round(duration, 2),
-                "samples": int(duration * 16000),
-                "tts_source": tts_source,
+                "samples": len(audio_int16),
+                "lang": lang,
+                "voice": voice,
             })
+
         except Exception as e:
             return web.json_response(
-                {"error": f"Audio processing failed: {e}"}, status=500
+                {"error": f"TTS failed: {e}"}, status=500
             )
 
 
@@ -261,7 +197,6 @@ if __name__ == "__main__":
     server = KioskServer(
         model_path=MODEL_PATH,
         api_key=API_SECRET,
-        openai_key=OPENAI_KEY,
         host=HOST,
         port=PORT,
         jpeg_quality=80,
