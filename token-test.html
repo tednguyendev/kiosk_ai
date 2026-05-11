@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>Token Test</title></head>
+<body>
+<h2>Token Test</h2>
+<div id="out"></div>
+<script>
+const out = document.getElementById('out');
+out.innerHTML = '<p>Loading...</p>';
+
+fetch('http://127.0.0.1:8082/token?identity=test&room=kiosk-room')
+  .then(r => { out.innerHTML += '<p>Status: ' + r.status + '</p>'; return r.json(); })
+  .then(d => { out.innerHTML += '<p>Token: ' + d.token.substring(0, 50) + '...</p>'; })
+  .catch(e => { out.innerHTML += '<p class="error">Error: ' + e.message + '</p>'; });
+</script>
+</body>
+</html>

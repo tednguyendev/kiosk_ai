@@ -1,0 +1,69 @@
+::1 - - [11/May/2026 13:53:25] "GET / HTTP/1.1" 200 -
+::1 - - [11/May/2026 13:53:27] code 404, message File not found
+::1 - - [11/May/2026 13:53:27] "GET /assets/kopitiam-logo.png HTTP/1.1" 404 -
+::1 - - [11/May/2026 13:53:27] code 404, message File not found
+::1 - - [11/May/2026 13:53:27] "GET /assets/background.png HTTP/1.1" 404 -
+::1 - - [11/May/2026 13:53:27] code 404, message File not found
+::1 - - [11/May/2026 13:53:27] "GET /favicon.ico HTTP/1.1" 404 -
+::1 - - [11/May/2026 13:53:28] code 404, message File not found
+::1 - - [11/May/2026 13:53:28] "GET /assets/kopitiam-logo.png HTTP/1.1" 404 -
+::1 - - [11/May/2026 13:53:28] code 404, message File not found
+::1 - - [11/May/2026 13:53:28] "GET /assets/sponsor-bar.png HTTP/1.1" 404 -
+::1 - - [11/May/2026 13:53:39] code 404, message File not found
+::1 - - [11/May/2026 13:53:39] "GET /favicon.ico HTTP/1.1" 404 -
+::1 - - [11/May/2026 13:53:54] "GET /index-bithuman.html HTTP/1.1" 304 -
+::1 - - [11/May/2026 13:53:55] code 404, message File not found
+::1 - - [11/May/2026 13:53:55] "GET /assets/kopitiam-logo.png HTTP/1.1" 404 -
+::1 - - [11/May/2026 13:53:55] code 404, message File not found
+::1 - - [11/May/2026 13:53:55] "GET /assets/background.png HTTP/1.1" 404 -
+::1 - - [11/May/2026 13:56:22] code 404, message File not found
+::1 - - [11/May/2026 13:56:22] "GET /assets/kopitiam-logo.png HTTP/1.1" 404 -
+::1 - - [11/May/2026 13:56:22] code 404, message File not found
+::1 - - [11/May/2026 13:56:22] "GET /assets/sponsor-bar.png HTTP/1.1" 404 -
+::1 - - [11/May/2026 13:56:28] code 404, message File not found
+::1 - - [11/May/2026 13:56:28] "GET /favicon.ico HTTP/1.1" 404 -
+::1 - - [11/May/2026 13:57:12] "GET /index-bithuman.html HTTP/1.1" 304 -
+::1 - - [11/May/2026 13:57:14] code 404, message File not found
+::1 - - [11/May/2026 13:57:14] "GET /assets/kopitiam-logo.png HTTP/1.1" 404 -
+::1 - - [11/May/2026 13:57:14] code 404, message File not found
+::1 - - [11/May/2026 13:57:14] "GET /assets/background.png HTTP/1.1" 404 -
+::1 - - [11/May/2026 14:18:40] "GET /index-bithuman.html HTTP/1.1" 200 -
+::1 - - [11/May/2026 14:18:41] code 404, message File not found
+::1 - - [11/May/2026 14:18:41] "GET /assets/kopitiam-logo.png HTTP/1.1" 404 -
+::1 - - [11/May/2026 14:18:41] code 404, message File not found
+::1 - - [11/May/2026 14:18:41] "GET /assets/background.png HTTP/1.1" 404 -
+::1 - - [11/May/2026 14:18:42] code 404, message File not found
+::1 - - [11/May/2026 14:18:42] "GET /assets/kopitiam-logo.png HTTP/1.1" 404 -
+::1 - - [11/May/2026 14:18:42] code 404, message File not found
+::1 - - [11/May/2026 14:18:42] "GET /assets/sponsor-bar.png HTTP/1.1" 404 -
+::1 - - [11/May/2026 14:18:47] code 404, message File not found
+::1 - - [11/May/2026 14:18:47] "GET /favicon.ico HTTP/1.1" 404 -
+::1 - - [11/May/2026 14:18:49] "GET /index-bithuman.html HTTP/1.1" 304 -
+::1 - - [11/May/2026 14:18:49] code 404, message File not found
+::1 - - [11/May/2026 14:18:49] "GET /assets/kopitiam-logo.png HTTP/1.1" 404 -
+::1 - - [11/May/2026 14:18:49] code 404, message File not found
+::1 - - [11/May/2026 14:18:49] "GET /assets/background.png HTTP/1.1" 404 -
+::1 - - [11/May/2026 14:22:46] "GET /test-chinese.html HTTP/1.1" 200 -
+::1 - - [11/May/2026 14:22:46] "GET /assets/chinese-test.mp3 HTTP/1.1" 200 -
+::1 - - [11/May/2026 14:24:08] code 404, message File not found
+::1 - - [11/May/2026 14:24:08] "GET /assets/sponsor-bar.png HTTP/1.1" 404 -
+::1 - - [11/May/2026 14:24:08] code 404, message File not found
+::1 - - [11/May/2026 14:24:08] "GET /assets/kopitiam-logo.png HTTP/1.1" 404 -
+::1 - - [11/May/2026 14:24:15] code 404, message File not found
+::1 - - [11/May/2026 14:24:15] "GET /favicon.ico HTTP/1.1" 404 -
+::1 - - [11/May/2026 14:25:30] "GET /assets/chinese-test.mp3 HTTP/1.1" 304 -
+::1 - - [11/May/2026 14:25:43] code 404, message File not found
+::1 - - [11/May/2026 14:25:43] "GET /favicon.ico HTTP/1.1" 404 -
+::1 - - [11/May/2026 14:26:55] "GET /index-bithuman.html HTTP/1.1" 304 -
+::1 - - [11/May/2026 14:26:57] code 404, message File not found
+::1 - - [11/May/2026 14:26:57] "GET /assets/kopitiam-logo.png HTTP/1.1" 404 -
+::1 - - [11/May/2026 14:26:57] code 404, message File not found
+::1 - - [11/May/2026 14:26:57] "GET /assets/background.png HTTP/1.1" 404 -
+::1 - - [11/May/2026 14:38:33] "GET /index-anam.html HTTP/1.1" 200 -
+::1 - - [11/May/2026 14:38:34] code 404, message File not found
+::1 - - [11/May/2026 14:38:34] "GET /assets/kopitiam-logo.png HTTP/1.1" 404 -
+::1 - - [11/May/2026 14:38:34] code 404, message File not found
+::1 - - [11/May/2026 14:38:34] "GET /assets/background.png HTTP/1.1" 404 -
+::1 - - [11/May/2026 16:06:59] "GET /livekit-kiosk.html HTTP/1.1" 200 -
+::1 - - [11/May/2026 16:17:29] "GET /livekit-debug.html HTTP/1.1" 200 -
+::1 - - [11/May/2026 16:23:28] "GET /token-test.html HTTP/1.1" 200 -

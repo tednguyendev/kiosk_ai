@@ -1,0 +1,978 @@
+objc[87926]: Class AVFFrameReceiver is implemented in both /Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-packages/av/.dylibs/libavdevice.62.1.100.dylib (0x1079043a8) and /Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-packages/cv2/.dylibs/libavdevice.61.3.100.dylib (0x10ec243a8). One of the two will be used. Which one is undefined.
+objc[87926]: Class AVFAudioReceiver is implemented in both /Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-packages/av/.dylibs/libavdevice.62.1.100.dylib (0x1079043f8) and /Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-packages/cv2/.dylibs/libavdevice.61.3.100.dylib (0x10ec243f8). One of the two will be used. Which one is undefined.
+    17:54:46.733 DEBUG    asyncio            Using selector: KqueueSelector  
+    17:54:46.735 DEV      livekit.agents     Watching                           
+                                             /Users/nguyenvu/projects/kiosk_ai  
+objc[87985]: Class AVFFrameReceiver is implemented in both /Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-packages/av/.dylibs/libavdevice.62.1.100.dylib (0x105d443a8) and /Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-packages/cv2/.dylibs/libavdevice.61.3.100.dylib (0x11c2e43a8). One of the two will be used. Which one is undefined.
+objc[87985]: Class AVFAudioReceiver is implemented in both /Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-packages/av/.dylibs/libavdevice.62.1.100.dylib (0x105d443f8) and /Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-packages/cv2/.dylibs/libavdevice.61.3.100.dylib (0x11c2e43f8). One of the two will be used. Which one is undefined.
+    17:54:48.068 DEBUG    asyncio            Using selector: KqueueSelector  
+    17:54:48.072 INFO     livekit.agents     starting worker  
+                                         {"version": "1.5.8", "rtc-version": 
+"1.1.7"}
+    17:54:48.075 INFO     livekit.agents     plugin registered  
+                                         {"plugin": "livekit.plugins.bithuman", 
+"version": "1.5.8"}
+    17:54:48.077 INFO     livekit.agents     plugin registered  
+                                         {"plugin": "livekit.plugins.openai", 
+"version": "1.5.8"}
+    17:54:48.078 INFO     livekit.agents     plugin registered  
+                                         {"plugin": "livekit.plugins.silero", 
+"version": "1.5.8"}
+    17:54:48.081 INFO     livekit.agents     HTTP server listening on :54461  
+/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-packages/jwt/api_jwt.py:147: InsecureKeyLengthWarning: The HMAC key is 6 bytes long, which is below the minimum recommended length of 32 bytes for SHA256. See RFC 7518 Section 3.2.
+  return self._jws.encode(
+    17:54:49.429 INFO     livekit.agents     registered worker  
+                                         {"agent_name": "", "id": 
+"AW_RHrkT6qy9xfK", "url": "wss://4015-118-68-100-183.ngrok-free.app", "region": 
+"", "protocol": 17}
+    18:34:10.510 WARNING  livekit.agents     failed to connect to livekit,      
+                                             retrying in 0s                     
+Traceback (most recent call last):
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1085, in _connection_task
+    await self._run_ws(ws)
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1167, in _run_ws
+    await asyncio.gather(*tasks)
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1139, in _recv_task
+    raise Exception("worker connection closed unexpectedly")
+Exception: worker connection closed unexpectedly
+
+    18:34:11.937 INFO     livekit.agents     registered worker  
+                                         {"agent_name": "", "id": 
+"AW_Dqq8UnfDGzKU", "url": "wss://4015-118-68-100-183.ngrok-free.app", "region": 
+"", "protocol": 17}
+    19:02:53.769 WARNING  livekit.agents     failed to connect to livekit,      
+                                             retrying in 0s                     
+Traceback (most recent call last):
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1085, in _connection_task
+    await self._run_ws(ws)
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1167, in _run_ws
+    await asyncio.gather(*tasks)
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1139, in _recv_task
+    raise Exception("worker connection closed unexpectedly")
+Exception: worker connection closed unexpectedly
+
+    19:02:54.013 WARNING  livekit.agents     failed to connect to livekit,      
+                                             retrying in 2s                     
+Traceback (most recent call last):
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1042, in _connection_task
+    ws = await self._http_session.ws_connect(
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/aiohttp/client.py", line 1104, in _ws_connect
+    raise WSServerHandshakeError(
+    ...<5 lines>...
+    )
+aiohttp.client_exceptions.WSServerHandshakeError: 404, message='Invalid response
+status', url='wss://4015-118-68-100-183.ngrok-free.app/agent'
+
+    19:02:57.311 INFO     livekit.agents     registered worker  
+                                         {"agent_name": "", "id": 
+"AW_eUbmofE4LcBt", "url": "wss://4015-118-68-100-183.ngrok-free.app", "region": 
+"", "protocol": 17}
+    19:21:44.063 WARNING  livekit.agents     failed to connect to livekit,      
+                                             retrying in 0s                     
+Traceback (most recent call last):
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1085, in _connection_task
+    await self._run_ws(ws)
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1167, in _run_ws
+    await asyncio.gather(*tasks)
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1139, in _recv_task
+    raise Exception("worker connection closed unexpectedly")
+Exception: worker connection closed unexpectedly
+
+    19:21:45.424 INFO     livekit.agents     registered worker  
+                                         {"agent_name": "", "id": 
+"AW_bSZLSJGXg7RZ", "url": "wss://4015-118-68-100-183.ngrok-free.app", "region": 
+"", "protocol": 17}
+    19:37:42.126 WARNING  livekit.agents     failed to connect to livekit,      
+                                             retrying in 0s                     
+Traceback (most recent call last):
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1085, in _connection_task
+    await self._run_ws(ws)
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1167, in _run_ws
+    await asyncio.gather(*tasks)
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1139, in _recv_task
+    raise Exception("worker connection closed unexpectedly")
+Exception: worker connection closed unexpectedly
+
+    19:37:43.531 INFO     livekit.agents     registered worker  
+                                         {"agent_name": "", "id": 
+"AW_Rhh9gRvCCfRC", "url": "wss://4015-118-68-100-183.ngrok-free.app", "region": 
+"", "protocol": 17}
+    19:39:15.165 WARNING  livekit.agents     failed to connect to livekit,      
+                                             retrying in 0s                     
+Traceback (most recent call last):
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1085, in _connection_task
+    await self._run_ws(ws)
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1167, in _run_ws
+    await asyncio.gather(*tasks)
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1139, in _recv_task
+    raise Exception("worker connection closed unexpectedly")
+Exception: worker connection closed unexpectedly
+
+    19:39:15.342 WARNING  livekit.agents     failed to connect to livekit,      
+                                             retrying in 2s                     
+Traceback (most recent call last):
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1042, in _connection_task
+    ws = await self._http_session.ws_connect(
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/aiohttp/client.py", line 1104, in _ws_connect
+    raise WSServerHandshakeError(
+    ...<5 lines>...
+    )
+aiohttp.client_exceptions.WSServerHandshakeError: 404, message='Invalid response
+status', url='wss://4015-118-68-100-183.ngrok-free.app/agent'
+
+    19:39:17.461 WARNING  livekit.agents     failed to connect to livekit,      
+                                             retrying in 4s                     
+Traceback (most recent call last):
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1042, in _connection_task
+    ws = await self._http_session.ws_connect(
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/aiohttp/client.py", line 1104, in _ws_connect
+    raise WSServerHandshakeError(
+    ...<5 lines>...
+    )
+aiohttp.client_exceptions.WSServerHandshakeError: 404, message='Invalid response
+status', url='wss://4015-118-68-100-183.ngrok-free.app/agent'
+
+    19:39:21.617 WARNING  livekit.agents     failed to connect to livekit,      
+                                             retrying in 6s                     
+Traceback (most recent call last):
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1042, in _connection_task
+    ws = await self._http_session.ws_connect(
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/aiohttp/client.py", line 1104, in _ws_connect
+    raise WSServerHandshakeError(
+    ...<5 lines>...
+    )
+aiohttp.client_exceptions.WSServerHandshakeError: 404, message='Invalid response
+status', url='wss://4015-118-68-100-183.ngrok-free.app/agent'
+
+    19:39:27.789 WARNING  livekit.agents     failed to connect to livekit,      
+                                             retrying in 8s                     
+Traceback (most recent call last):
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1042, in _connection_task
+    ws = await self._http_session.ws_connect(
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/aiohttp/client.py", line 1104, in _ws_connect
+    raise WSServerHandshakeError(
+    ...<5 lines>...
+    )
+aiohttp.client_exceptions.WSServerHandshakeError: 404, message='Invalid response
+status', url='wss://4015-118-68-100-183.ngrok-free.app/agent'
+
+    19:39:35.926 WARNING  livekit.agents     failed to connect to livekit,      
+                                             retrying in 10s                    
+Traceback (most recent call last):
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1042, in _connection_task
+    ws = await self._http_session.ws_connect(
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/aiohttp/client.py", line 1104, in _ws_connect
+    raise WSServerHandshakeError(
+    ...<5 lines>...
+    )
+aiohttp.client_exceptions.WSServerHandshakeError: 404, message='Invalid response
+status', url='wss://4015-118-68-100-183.ngrok-free.app/agent'
+
+    19:39:46.068 WARNING  livekit.agents     failed to connect to livekit,      
+                                             retrying in 10s                    
+Traceback (most recent call last):
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1042, in _connection_task
+    ws = await self._http_session.ws_connect(
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/aiohttp/client.py", line 1104, in _ws_connect
+    raise WSServerHandshakeError(
+    ...<5 lines>...
+    )
+aiohttp.client_exceptions.WSServerHandshakeError: 404, message='Invalid response
+status', url='wss://4015-118-68-100-183.ngrok-free.app/agent'
+
+    19:39:57.612 INFO     livekit.agents     registered worker  
+                                         {"agent_name": "", "id": 
+"AW_SAwMGLVPbq4P", "url": "wss://4015-118-68-100-183.ngrok-free.app", "region": 
+"", "protocol": 17}
+    19:42:15.454 WARNING  livekit.agents     failed to connect to livekit,      
+                                             retrying in 0s                     
+Traceback (most recent call last):
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1085, in _connection_task
+    await self._run_ws(ws)
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1167, in _run_ws
+    await asyncio.gather(*tasks)
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1139, in _recv_task
+    raise Exception("worker connection closed unexpectedly")
+Exception: worker connection closed unexpectedly
+
+    19:42:15.636 WARNING  livekit.agents     failed to connect to livekit,      
+                                             retrying in 2s                     
+Traceback (most recent call last):
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1042, in _connection_task
+    ws = await self._http_session.ws_connect(
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/aiohttp/client.py", line 1104, in _ws_connect
+    raise WSServerHandshakeError(
+    ...<5 lines>...
+    )
+aiohttp.client_exceptions.WSServerHandshakeError: 404, message='Invalid response
+status', url='wss://4015-118-68-100-183.ngrok-free.app/agent'
+
+    19:42:18.907 INFO     livekit.agents     registered worker  
+                                         {"agent_name": "", "id": 
+"AW_LiaJj2stjmEW", "url": "wss://4015-118-68-100-183.ngrok-free.app", "region": 
+"", "protocol": 17}
+    19:49:12.328 WARNING  livekit.agents     failed to connect to livekit,      
+                                             retrying in 0s                     
+Traceback (most recent call last):
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1085, in _connection_task
+    await self._run_ws(ws)
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1167, in _run_ws
+    await asyncio.gather(*tasks)
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1139, in _recv_task
+    raise Exception("worker connection closed unexpectedly")
+Exception: worker connection closed unexpectedly
+
+    19:49:14.269 INFO     livekit.agents     registered worker  
+                                         {"agent_name": "", "id": 
+"AW_d3g33h3hbpX4", "url": "wss://4015-118-68-100-183.ngrok-free.app", "region": 
+"", "protocol": 17}
+    19:50:16.178 WARNING  livekit.agents     failed to connect to livekit,      
+                                             retrying in 0s                     
+Traceback (most recent call last):
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1085, in _connection_task
+    await self._run_ws(ws)
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1167, in _run_ws
+    await asyncio.gather(*tasks)
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1139, in _recv_task
+    raise Exception("worker connection closed unexpectedly")
+Exception: worker connection closed unexpectedly
+
+    19:50:16.300 WARNING  livekit.agents     failed to connect to livekit,      
+                                             retrying in 2s                     
+Traceback (most recent call last):
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1042, in _connection_task
+    ws = await self._http_session.ws_connect(
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/aiohttp/client.py", line 1104, in _ws_connect
+    raise WSServerHandshakeError(
+    ...<5 lines>...
+    )
+aiohttp.client_exceptions.WSServerHandshakeError: 404, message='Invalid response
+status', url='wss://4015-118-68-100-183.ngrok-free.app/agent'
+
+    19:50:18.457 WARNING  livekit.agents     failed to connect to livekit,      
+                                             retrying in 4s                     
+Traceback (most recent call last):
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1042, in _connection_task
+    ws = await self._http_session.ws_connect(
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/aiohttp/client.py", line 1104, in _ws_connect
+    raise WSServerHandshakeError(
+    ...<5 lines>...
+    )
+aiohttp.client_exceptions.WSServerHandshakeError: 404, message='Invalid response
+status', url='wss://4015-118-68-100-183.ngrok-free.app/agent'
+
+    19:50:22.640 WARNING  livekit.agents     failed to connect to livekit,      
+                                             retrying in 6s                     
+Traceback (most recent call last):
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1042, in _connection_task
+    ws = await self._http_session.ws_connect(
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/aiohttp/client.py", line 1104, in _ws_connect
+    raise WSServerHandshakeError(
+    ...<5 lines>...
+    )
+aiohttp.client_exceptions.WSServerHandshakeError: 404, message='Invalid response
+status', url='wss://4015-118-68-100-183.ngrok-free.app/agent'
+
+    19:50:28.742 WARNING  livekit.agents     failed to connect to livekit,      
+                                             retrying in 8s                     
+Traceback (most recent call last):
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1042, in _connection_task
+    ws = await self._http_session.ws_connect(
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/aiohttp/client.py", line 1104, in _ws_connect
+    raise WSServerHandshakeError(
+    ...<5 lines>...
+    )
+aiohttp.client_exceptions.WSServerHandshakeError: 404, message='Invalid response
+status', url='wss://4015-118-68-100-183.ngrok-free.app/agent'
+
+    19:50:36.885 WARNING  livekit.agents     failed to connect to livekit,      
+                                             retrying in 10s                    
+Traceback (most recent call last):
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1042, in _connection_task
+    ws = await self._http_session.ws_connect(
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/aiohttp/client.py", line 1104, in _ws_connect
+    raise WSServerHandshakeError(
+    ...<5 lines>...
+    )
+aiohttp.client_exceptions.WSServerHandshakeError: 404, message='Invalid response
+status', url='wss://4015-118-68-100-183.ngrok-free.app/agent'
+
+    19:50:47.042 WARNING  livekit.agents     failed to connect to livekit,      
+                                             retrying in 10s                    
+Traceback (most recent call last):
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1042, in _connection_task
+    ws = await self._http_session.ws_connect(
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/aiohttp/client.py", line 1104, in _ws_connect
+    raise WSServerHandshakeError(
+    ...<5 lines>...
+    )
+aiohttp.client_exceptions.WSServerHandshakeError: 404, message='Invalid response
+status', url='wss://4015-118-68-100-183.ngrok-free.app/agent'
+
+    19:50:57.221 WARNING  livekit.agents     failed to connect to livekit,      
+                                             retrying in 10s                    
+Traceback (most recent call last):
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1042, in _connection_task
+    ws = await self._http_session.ws_connect(
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/aiohttp/client.py", line 1104, in _ws_connect
+    raise WSServerHandshakeError(
+    ...<5 lines>...
+    )
+aiohttp.client_exceptions.WSServerHandshakeError: 404, message='Invalid response
+status', url='wss://4015-118-68-100-183.ngrok-free.app/agent'
+
+    19:51:08.863 INFO     livekit.agents     registered worker  
+                                         {"agent_name": "", "id": 
+"AW_itosPd8aSA89", "url": "wss://4015-118-68-100-183.ngrok-free.app", "region": 
+"", "protocol": 17}
+    19:53:14.357 WARNING  livekit.agents     failed to connect to livekit,      
+                                             retrying in 0s                     
+Traceback (most recent call last):
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1085, in _connection_task
+    await self._run_ws(ws)
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1167, in _run_ws
+    await asyncio.gather(*tasks)
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1139, in _recv_task
+    raise Exception("worker connection closed unexpectedly")
+Exception: worker connection closed unexpectedly
+
+    19:53:14.563 WARNING  livekit.agents     failed to connect to livekit,      
+                                             retrying in 2s                     
+Traceback (most recent call last):
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1042, in _connection_task
+    ws = await self._http_session.ws_connect(
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/aiohttp/client.py", line 1104, in _ws_connect
+    raise WSServerHandshakeError(
+    ...<5 lines>...
+    )
+aiohttp.client_exceptions.WSServerHandshakeError: 404, message='Invalid response
+status', url='wss://4015-118-68-100-183.ngrok-free.app/agent'
+
+    19:53:16.681 WARNING  livekit.agents     failed to connect to livekit,      
+                                             retrying in 4s                     
+Traceback (most recent call last):
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1042, in _connection_task
+    ws = await self._http_session.ws_connect(
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/aiohttp/client.py", line 1104, in _ws_connect
+    raise WSServerHandshakeError(
+    ...<5 lines>...
+    )
+aiohttp.client_exceptions.WSServerHandshakeError: 404, message='Invalid response
+status', url='wss://4015-118-68-100-183.ngrok-free.app/agent'
+
+    19:53:20.789 WARNING  livekit.agents     failed to connect to livekit,      
+                                             retrying in 6s                     
+Traceback (most recent call last):
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1042, in _connection_task
+    ws = await self._http_session.ws_connect(
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/aiohttp/client.py", line 1104, in _ws_connect
+    raise WSServerHandshakeError(
+    ...<5 lines>...
+    )
+aiohttp.client_exceptions.WSServerHandshakeError: 404, message='Invalid response
+status', url='wss://4015-118-68-100-183.ngrok-free.app/agent'
+
+    19:53:26.961 WARNING  livekit.agents     failed to connect to livekit,      
+                                             retrying in 8s                     
+Traceback (most recent call last):
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1042, in _connection_task
+    ws = await self._http_session.ws_connect(
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/aiohttp/client.py", line 1104, in _ws_connect
+    raise WSServerHandshakeError(
+    ...<5 lines>...
+    )
+aiohttp.client_exceptions.WSServerHandshakeError: 404, message='Invalid response
+status', url='wss://4015-118-68-100-183.ngrok-free.app/agent'
+
+    19:53:35.093 WARNING  livekit.agents     failed to connect to livekit,      
+                                             retrying in 10s                    
+Traceback (most recent call last):
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1042, in _connection_task
+    ws = await self._http_session.ws_connect(
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/aiohttp/client.py", line 1104, in _ws_connect
+    raise WSServerHandshakeError(
+    ...<5 lines>...
+    )
+aiohttp.client_exceptions.WSServerHandshakeError: 404, message='Invalid response
+status', url='wss://4015-118-68-100-183.ngrok-free.app/agent'
+
+    19:53:45.259 WARNING  livekit.agents     failed to connect to livekit,      
+                                             retrying in 10s                    
+Traceback (most recent call last):
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1042, in _connection_task
+    ws = await self._http_session.ws_connect(
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/aiohttp/client.py", line 1104, in _ws_connect
+    raise WSServerHandshakeError(
+    ...<5 lines>...
+    )
+aiohttp.client_exceptions.WSServerHandshakeError: 404, message='Invalid response
+status', url='wss://4015-118-68-100-183.ngrok-free.app/agent'
+
+    19:53:55.423 WARNING  livekit.agents     failed to connect to livekit,      
+                                             retrying in 10s                    
+Traceback (most recent call last):
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1042, in _connection_task
+    ws = await self._http_session.ws_connect(
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/aiohttp/client.py", line 1104, in _ws_connect
+    raise WSServerHandshakeError(
+    ...<5 lines>...
+    )
+aiohttp.client_exceptions.WSServerHandshakeError: 404, message='Invalid response
+status', url='wss://4015-118-68-100-183.ngrok-free.app/agent'
+
+    19:54:05.768 WARNING  livekit.agents     failed to connect to livekit,      
+                                             retrying in 10s                    
+Traceback (most recent call last):
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1042, in _connection_task
+    ws = await self._http_session.ws_connect(
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/aiohttp/client.py", line 1104, in _ws_connect
+    raise WSServerHandshakeError(
+    ...<5 lines>...
+    )
+aiohttp.client_exceptions.WSServerHandshakeError: 404, message='Invalid response
+status', url='wss://4015-118-68-100-183.ngrok-free.app/agent'
+
+    19:54:17.104 INFO     livekit.agents     registered worker  
+                                         {"agent_name": "", "id": 
+"AW_9sU78JmgHPhF", "url": "wss://4015-118-68-100-183.ngrok-free.app", "region": 
+"", "protocol": 17}
+    19:56:23.725 WARNING  livekit.agents     failed to connect to livekit,      
+                                             retrying in 0s                     
+Traceback (most recent call last):
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1085, in _connection_task
+    await self._run_ws(ws)
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1167, in _run_ws
+    await asyncio.gather(*tasks)
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1139, in _recv_task
+    raise Exception("worker connection closed unexpectedly")
+Exception: worker connection closed unexpectedly
+
+    19:56:23.948 WARNING  livekit.agents     failed to connect to livekit,      
+                                             retrying in 2s                     
+Traceback (most recent call last):
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1042, in _connection_task
+    ws = await self._http_session.ws_connect(
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/aiohttp/client.py", line 1104, in _ws_connect
+    raise WSServerHandshakeError(
+    ...<5 lines>...
+    )
+aiohttp.client_exceptions.WSServerHandshakeError: 404, message='Invalid response
+status', url='wss://4015-118-68-100-183.ngrok-free.app/agent'
+
+    19:56:26.056 WARNING  livekit.agents     failed to connect to livekit,      
+                                             retrying in 4s                     
+Traceback (most recent call last):
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1042, in _connection_task
+    ws = await self._http_session.ws_connect(
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/aiohttp/client.py", line 1104, in _ws_connect
+    raise WSServerHandshakeError(
+    ...<5 lines>...
+    )
+aiohttp.client_exceptions.WSServerHandshakeError: 404, message='Invalid response
+status', url='wss://4015-118-68-100-183.ngrok-free.app/agent'
+
+    19:56:30.220 WARNING  livekit.agents     failed to connect to livekit,      
+                                             retrying in 6s                     
+Traceback (most recent call last):
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1042, in _connection_task
+    ws = await self._http_session.ws_connect(
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/aiohttp/client.py", line 1104, in _ws_connect
+    raise WSServerHandshakeError(
+    ...<5 lines>...
+    )
+aiohttp.client_exceptions.WSServerHandshakeError: 404, message='Invalid response
+status', url='wss://4015-118-68-100-183.ngrok-free.app/agent'
+
+    19:56:36.338 WARNING  livekit.agents     failed to connect to livekit,      
+                                             retrying in 8s                     
+Traceback (most recent call last):
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1042, in _connection_task
+    ws = await self._http_session.ws_connect(
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/aiohttp/client.py", line 1104, in _ws_connect
+    raise WSServerHandshakeError(
+    ...<5 lines>...
+    )
+aiohttp.client_exceptions.WSServerHandshakeError: 404, message='Invalid response
+status', url='wss://4015-118-68-100-183.ngrok-free.app/agent'
+
+    19:56:44.455 WARNING  livekit.agents     failed to connect to livekit,      
+                                             retrying in 10s                    
+Traceback (most recent call last):
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1042, in _connection_task
+    ws = await self._http_session.ws_connect(
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/aiohttp/client.py", line 1104, in _ws_connect
+    raise WSServerHandshakeError(
+    ...<5 lines>...
+    )
+aiohttp.client_exceptions.WSServerHandshakeError: 404, message='Invalid response
+status', url='wss://4015-118-68-100-183.ngrok-free.app/agent'
+
+    19:56:54.573 WARNING  livekit.agents     failed to connect to livekit,      
+                                             retrying in 10s                    
+Traceback (most recent call last):
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1042, in _connection_task
+    ws = await self._http_session.ws_connect(
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/aiohttp/client.py", line 1104, in _ws_connect
+    raise WSServerHandshakeError(
+    ...<5 lines>...
+    )
+aiohttp.client_exceptions.WSServerHandshakeError: 404, message='Invalid response
+status', url='wss://4015-118-68-100-183.ngrok-free.app/agent'
+
+    19:57:04.692 WARNING  livekit.agents     failed to connect to livekit,      
+                                             retrying in 10s                    
+Traceback (most recent call last):
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1042, in _connection_task
+    ws = await self._http_session.ws_connect(
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/aiohttp/client.py", line 1104, in _ws_connect
+    raise WSServerHandshakeError(
+    ...<5 lines>...
+    )
+aiohttp.client_exceptions.WSServerHandshakeError: 404, message='Invalid response
+status', url='wss://4015-118-68-100-183.ngrok-free.app/agent'
+
+    19:57:16.292 INFO     livekit.agents     registered worker  
+                                         {"agent_name": "", "id": 
+"AW_36MXC4BagRrd", "url": "wss://4015-118-68-100-183.ngrok-free.app", "region": 
+"", "protocol": 17}
+    20:08:36.829 WARNING  livekit.agents     failed to connect to livekit,      
+                                             retrying in 0s                     
+Traceback (most recent call last):
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1085, in _connection_task
+    await self._run_ws(ws)
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1167, in _run_ws
+    await asyncio.gather(*tasks)
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1139, in _recv_task
+    raise Exception("worker connection closed unexpectedly")
+Exception: worker connection closed unexpectedly
+
+    20:08:36.990 WARNING  livekit.agents     failed to connect to livekit,      
+                                             retrying in 2s                     
+Traceback (most recent call last):
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1042, in _connection_task
+    ws = await self._http_session.ws_connect(
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/aiohttp/client.py", line 1104, in _ws_connect
+    raise WSServerHandshakeError(
+    ...<5 lines>...
+    )
+aiohttp.client_exceptions.WSServerHandshakeError: 404, message='Invalid response
+status', url='wss://4015-118-68-100-183.ngrok-free.app/agent'
+
+    20:08:39.143 WARNING  livekit.agents     failed to connect to livekit,      
+                                             retrying in 4s                     
+Traceback (most recent call last):
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1042, in _connection_task
+    ws = await self._http_session.ws_connect(
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/aiohttp/client.py", line 1104, in _ws_connect
+    raise WSServerHandshakeError(
+    ...<5 lines>...
+    )
+aiohttp.client_exceptions.WSServerHandshakeError: 404, message='Invalid response
+status', url='wss://4015-118-68-100-183.ngrok-free.app/agent'
+
+    20:08:43.264 WARNING  livekit.agents     failed to connect to livekit,      
+                                             retrying in 6s                     
+Traceback (most recent call last):
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1042, in _connection_task
+    ws = await self._http_session.ws_connect(
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/aiohttp/client.py", line 1104, in _ws_connect
+    raise WSServerHandshakeError(
+    ...<5 lines>...
+    )
+aiohttp.client_exceptions.WSServerHandshakeError: 404, message='Invalid response
+status', url='wss://4015-118-68-100-183.ngrok-free.app/agent'
+
+    20:08:49.374 WARNING  livekit.agents     failed to connect to livekit,      
+                                             retrying in 8s                     
+Traceback (most recent call last):
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1042, in _connection_task
+    ws = await self._http_session.ws_connect(
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/aiohttp/client.py", line 1104, in _ws_connect
+    raise WSServerHandshakeError(
+    ...<5 lines>...
+    )
+aiohttp.client_exceptions.WSServerHandshakeError: 404, message='Invalid response
+status', url='wss://4015-118-68-100-183.ngrok-free.app/agent'
+
+    20:08:57.558 WARNING  livekit.agents     failed to connect to livekit,      
+                                             retrying in 10s                    
+Traceback (most recent call last):
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1042, in _connection_task
+    ws = await self._http_session.ws_connect(
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/aiohttp/client.py", line 1104, in _ws_connect
+    raise WSServerHandshakeError(
+    ...<5 lines>...
+    )
+aiohttp.client_exceptions.WSServerHandshakeError: 404, message='Invalid response
+status', url='wss://4015-118-68-100-183.ngrok-free.app/agent'
+
+    20:09:07.671 WARNING  livekit.agents     failed to connect to livekit,      
+                                             retrying in 10s                    
+Traceback (most recent call last):
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/livekit/agents/worker.py", line 1042, in _connection_task
+    ws = await self._http_session.ws_connect(
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File 
+"/Users/nguyenvu/projects/kiosk_ai/bithuman-server/venv/lib/python3.14/site-pack
+ages/aiohttp/client.py", line 1104, in _ws_connect
+    raise WSServerHandshakeError(
+    ...<5 lines>...
+    )
+aiohttp.client_exceptions.WSServerHandshakeError: 404, message='Invalid response
+status', url='wss://4015-118-68-100-183.ngrok-free.app/agent'
+
+    20:09:20.210 INFO     livekit.agents     registered worker  
+                                         {"agent_name": "", "id": 
+"AW_3E4LsVbbLRPT", "url": "wss://4015-118-68-100-183.ngrok-free.app", "region": 
+"", "protocol": 17}

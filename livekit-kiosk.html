@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kopitiam Kiosk — LiveKit + bithuman Cloud</title>
+<script src="https://cdn.jsdelivr.net/npm/livekit-client@2.11.0/dist/livekit-client.umd.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: linear-gradient(180deg, #f4e6d0 0%, #e8d4b0 100%);
+    width: 100vw; height: 100vh;
+    overflow: hidden;
+    color: #333;
+  }
+  #app {
+    position: relative; width: 100%; height: 100%;
+    display: flex; align-items: center; justify-content: center;
+  }
+  /* Avatar container */
+  #avatar-container {
+    position: absolute;
+    width: 900px; height: 900px;
+    right: 80px; top: 50%;
+    transform: translateY(-50%);
+    border-radius: 50%;
+    border: 6px solid #c9a04d;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.15);
+    background: #000;
+    overflow: hidden;
+  }
+  #avatar-video {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    object-position: center top;
+    display: block;
+  }
+  #avatar-placeholder {
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    display: flex; align-items: center; justify-content: center;
+    flex-direction: column;
+    background: linear-gradient(180deg, #f4e6d0 0%, #e8d4b0 100%);
+  }
+  #avatar-placeholder svg { opacity: 0.35; }
+  #avatar-placeholder .spinner {
+    width: 32px; height: 32px;
+    border: 3px solid rgba(207,70,58,0.25);
+    border-top-color: #cf463a;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-top: 16px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Chat area */
+  #chat-area {
+    position: absolute;
+    left: 80px; top: 50%;
+    transform: translateY(-50%);
+    width: 700px;
+    display: flex; flex-direction: column;
+    gap: 24px;
+  }
+  h1 {
+    font-size: 56px; font-weight: 700;
+    color: #2c1e14;
+    line-height: 1.2;
+  }
+  h1 span { color: #cf463a; }
+  .subtitle {
+    font-size: 28px; color: #7a5a3a;
+    font-weight: 500;
+  }
+  #status {
+    font-size: 20px; color: #7a5a3a;
+    padding: 16px 24px;
+    background: rgba(255,255,255,0.5);
+    border-radius: 16px;
+    backdrop-filter: blur(8px);
+  }
+  #mic-btn {
+    width: 120px; height: 120px;
+    border-radius: 50%;
+    border: none;
+    background: #cf463a;
+    color: white;
+    font-size: 18px;
+    cursor: pointer;
+    box-shadow: 0 4px 20px rgba(207,70,58,0.3);
+    transition: all 0.3s;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #mic-btn:hover { transform: scale(1.05); }
+  #mic-btn.active {
+    background: #2d8a4e;
+    box-shadow: 0 4px 20px rgba(45,138,78,0.3);
+  }
+  .hint { font-size: 16px; color: #999; margin-top: 8px; }
+
+  /* Connect overlay */
+  #connect-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.4);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 100;
+  }
+  #connect-box {
+    background: white; padding: 40px; border-radius: 24px;
+    max-width: 500px; width: 90%;
+    text-align: center;
+  }
+  #connect-box h2 { margin-bottom: 16px; color: #2c1e14; }
+  #connect-box input {
+    width: 100%; padding: 14px; font-size: 16px;
+    border: 2px solid #ddd; border-radius: 12px;
+    margin-bottom: 16px;
+  }
+  #connect-box button {
+    background: #cf463a; color: white;
+    border: none; padding: 14px 32px;
+    border-radius: 12px; font-size: 18px;
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <!-- Chat / Info Area -->
+  <div id="chat-area">
+    <h1>Chat with <span>Kimberly</span></h1>
+    <p class="subtitle">Your AI concierge at Kopitiam</p>
+    <div id="status">Click the microphone to start talking</div>
+    <button id="mic-btn">🎤 Start</button>
+    <p class="hint">LiveKit + bithuman Cloud Avatar</p>
+  </div>
+
+  <!-- Avatar -->
+  <div id="avatar-container">
+    <video id="avatar-video" autoplay playsinline muted></video>
+    <div id="avatar-placeholder">
+      <svg width="320" height="320" viewBox="0 0 200 200" style="opacity:0.35">
+        <circle cx="100" cy="75" r="38" fill="#cf463a"/>
+        <path d="M30 200 Q30 115 100 115 Q170 115 170 200 Z" fill="#cf463a"/>
+      </svg>
+      <div class="spinner"></div>
+      <p style="color:#7a5a3a; margin-top:12px; font-size:20px;">Connecting to avatar...</p>
+    </div>
+  </div>
+</div>
+
+<script>
+const LIVEKIT_URL = 'wss://4015-118-68-100-183.ngrok-free.app';
+const ROOM_NAME = 'kiosk-room';
+const IDENTITY = 'kiosk-user';
+
+let room = null;
+let isMicOn = false;
+let connectAttempted = false;
+
+function setStatus(msg) {
+  document.getElementById('status').textContent = msg;
+  console.log('[Kiosk]', msg);
+}
+
+function waitForLiveKitSDK(maxWait = 10000) {
+  return new Promise((resolve, reject) => {
+    const start = Date.now();
+    const check = () => {
+      if (typeof LivekitClient !== 'undefined' && LivekitClient.Room) {
+        resolve();
+      } else if (Date.now() - start > maxWait) {
+        reject(new Error('LiveKit SDK failed to load'));
+      } else {
+        setTimeout(check, 100);
+      }
+    };
+    check();
+  });
+}
+
+async function getToken(identity, roomName) {
+  const r = await fetch('http://127.0.0.1:8082/token?identity=' + encodeURIComponent(identity) + '&room=' + encodeURIComponent(roomName));
+  if (!r.ok) throw new Error('Token server error: ' + r.status);
+  const data = await r.json();
+  return data.token;
+}
+
+async function connect() {
+  if (connectAttempted) return;
+  connectAttempted = true;
+  setStatus('Loading LiveKit SDK...');
+
+  try {
+    await waitForLiveKitSDK();
+    setStatus('Getting token...');
+    const token = await getToken(IDENTITY, ROOM_NAME);
+    setStatus('Connecting to room...');
+
+    room = new LivekitClient.Room({
+      adaptiveStream: true,
+      dynacast: true,
+    });
+
+    room.on(LivekitClient.RoomEvent.TrackSubscribed, (track, publication, participant) => {
+      console.log('Track subscribed:', track.kind, 'from', participant.identity);
+      if (track.kind === 'video') {
+        const videoEl = document.getElementById('avatar-video');
+        track.attach(videoEl);
+        document.getElementById('avatar-placeholder').style.display = 'none';
+        setStatus('Kimberly is ready! Click mic to talk');
+      }
+      if (track.kind === 'audio') {
+        const audioEl = document.createElement('audio');
+        audioEl.autoplay = true;
+        document.body.appendChild(audioEl);
+        track.attach(audioEl);
+      }
+    });
+
+    room.on(LivekitClient.RoomEvent.TrackUnsubscribed, (track) => {
+      track.detach();
+    });
+
+    room.on(LivekitClient.RoomEvent.Disconnected, (reason) => {
+      setStatus('Disconnected: ' + (reason || 'unknown'));
+      document.getElementById('avatar-placeholder').style.display = 'flex';
+    });
+
+    room.on(LivekitClient.RoomEvent.ConnectionStateChanged, (state) => {
+      console.log('Connection state:', state);
+      if (state === 'connected') {
+        setStatus('Connected! Waiting for Kimberly...');
+      }
+    });
+
+    await room.connect(LIVEKIT_URL, token);
+    console.log('Connected to room:', room.name);
+    setStatus('Connected! Waiting for Kimberly...');
+
+    document.getElementById('mic-btn').addEventListener('click', toggleMic);
+  } catch (err) {
+    console.error('Connection failed:', err);
+    setStatus('Error: ' + err.message);
+    connectAttempted = false;
+  }
+}
+
+// Auto-connect when page loads
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', connect);
+} else {
+  connect();
+}
+
+async function toggleMic() {
+  if (!room) return;
+  const btn = document.getElementById('mic-btn');
+
+  if (!isMicOn) {
+    try {
+      await room.localParticipant.setMicrophoneEnabled(true);
+      isMicOn = true;
+      btn.textContent = '🔴 Stop';
+      btn.classList.add('active');
+      setStatus('Listening...');
+    } catch (err) {
+      console.error('Mic error:', err);
+      setStatus('Microphone error: ' + err.message);
+    }
+  } else {
+    await room.localParticipant.setMicrophoneEnabled(false);
+    isMicOn = false;
+    btn.textContent = '🎤 Start';
+    btn.classList.remove('active');
+    setStatus('Click mic to talk');
+  }
+}
+</script>
+
+</body>
+</html>

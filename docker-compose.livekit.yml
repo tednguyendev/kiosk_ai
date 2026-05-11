@@ -1,0 +1,10 @@
+version: "3.9"
+services:
+  livekit:
+    image: livekit/livekit-server:latest
+    command: --dev
+    ports:
+      - "7880:7880"     # WebSocket signaling
+      - "7881:7881"     # RTC UDP/TCP media
+      - "7882:7882"     # Prometheus metrics
+    restart: unless-stopped

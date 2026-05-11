@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chinese Speech Detection Test</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 20px;
+      background: #1a1a2e;
+      color: #eee;
+    }
+    h1 { color: #f5b150; }
+    .card {
+      background: #16213e;
+      border-radius: 16px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 1px solid #0f3460;
+    }
+    button {
+      background: #e94560;
+      color: white;
+      border: none;
+      padding: 14px 28px;
+      border-radius: 10px;
+      font-size: 16px;
+      cursor: pointer;
+      margin: 8px 8px 8px 0;
+      transition: opacity 0.2s;
+    }
+    button:hover { opacity: 0.85; }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-secondary { background: #0f3460; }
+    .result {
+      background: #0a0a1a;
+      border-radius: 10px;
+      padding: 16px;
+      margin-top: 16px;
+      font-family: 'SF Mono', Monaco, monospace;
+      font-size: 14px;
+      white-space: pre-wrap;
+      min-height: 60px;
+      border-left: 4px solid #f5b150;
+    }
+    .label {
+      color: #888;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+    audio { width: 100%; margin: 12px 0; }
+    .status { color: #f5b150; margin-top: 8px; }
+    .hint { color: #aaa; font-size: 14px; line-height: 1.6; }
+    .success { color: #4ade80; }
+    .error { color: #f87171; }
+  </style>
+</head>
+<body>
+  <h1>🎤 Chinese Speech Detection Test</h1>
+
+  <div class="card">
+    <div class="label">Test Audio</div>
+    <p class="hint">The audio says: <strong>"你好，我想吃鱼汤。这个档口有清真食品吗？"</strong></p>
+    <p class="hint">Translation: "Hello, I want to eat fish soup. Does this stall have halal food?"</p>
+    <audio id="audioPlayer" controls src="assets/chinese-test.mp3"></audio>
+  </div>
+
+  <div class="card">
+    <div class="label">Test 1: Play Through Speakers</div>
+    <p class="hint">
+      Open the <strong>kiosk app</strong> in another tab, make sure it's listening (the mic should be active),
+      then click play below. The kiosk's microphone should pick up the Chinese speech from your speakers.
+    </p>
+    <button onclick="playAndTest()">▶ Play Chinese Audio</button>
+    <div id="playStatus" class="status"></div>
+  </div>
+
+  <div class="card">
+    <div class="label">Test 2: Direct Whisper API Test</div>
+    <p class="hint">
+      This sends the Chinese audio file directly to OpenAI Whisper API (same endpoint the kiosk uses).
+      It bypasses the microphone and VAD to verify Chinese transcription works.
+    </p>
+    <button onclick="testWhisper()">🧪 Test Whisper Transcription</button>
+    <div id="whisperStatus" class="status"></div>
+    <div id="whisperResult" class="result" style="display:none"></div>
+  </div>
+
+  <div class="card">
+    <div class="label">Test 3: Fake Microphone Stream</div>
+    <p class="hint">
+      This monkey-patches <code>getUserMedia</code> to feed the Chinese audio file directly into the kiosk app
+      as if it came from the microphone. Then it loads the kiosk app in an iframe below.
+    </p>
+    <button onclick="injectFakeMic()">🔌 Inject Fake Mic & Load Kiosk</button>
+    <div id="injectStatus" class="status"></div>
+    <div id="kioskFrame" style="margin-top:16px; display:none;">
+      <iframe id="kioskIframe" style="width:100%; height:600px; border:2px solid #f5b150; border-radius:12px;"></iframe>
+    </div>
+  </div>
+
+  <script>
+    const OPENAI_API_KEY = window.__CONFIG?.OPENAI_API_KEY || localStorage.getItem('openai_key') || '';
+
+    function playAndTest() {
+      const audio = document.getElementById('audioPlayer');
+      audio.currentTime = 0;
+      audio.play();
+      document.getElementById('playStatus').textContent = 'Playing Chinese audio... make sure the kiosk tab is listening!';
+      audio.onended = () => {
+        document.getElementById('playStatus').textContent = 'Audio finished playing. Check the kiosk tab for a response.';
+      };
+    }
+
+    async function testWhisper() {
+      const status = document.getElementById('whisperStatus');
+      const resultBox = document.getElementById('whisperResult');
+      const key = prompt('Enter your OpenAI API key:', OPENAI_API_KEY);
+      if (!key) {
+        status.innerHTML = '<span class="error">API key required</span>';
+        return;
+      }
+      localStorage.setItem('openai_key', key);
+
+      status.textContent = 'Fetching audio file...';
+      try {
+        const audioRes = await fetch('assets/chinese-test.mp3');
+        const blob = await audioRes.blob();
+        status.textContent = 'Sending to Whisper API...';
+
+        const formData = new FormData();
+        formData.append('file', blob, 'chinese-test.mp3');
+        formData.append('model', 'whisper-1');
+        formData.append('temperature', '0');
+        formData.append('prompt', 'Food court customer asking about stalls, dishes, halal options.');
+        formData.append('response_format', 'verbose_json');
+
+        const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${key}` },
+          body: formData,
+        });
+
+        const raw = await res.text();
+        const data = JSON.parse(raw);
+
+        resultBox.style.display = 'block';
+        if (res.ok) {
+          const lang = data.language || 'unknown';
+          const text = data.text || '(no text)';
+          const noSpeechProb = data.segments?.[0]?.no_speech_prob ?? 'N/A';
+          const avgLogprob = data.segments?.[0]?.avg_logprob ?? 'N/A';
+          status.innerHTML = '<span class="success">✅ Transcription successful!</span>';
+          resultBox.innerHTML =
+            `<strong>Detected Language:</strong> ${lang}\n` +
+            `<strong>Transcription:</strong> ${text}\n` +
+            `<strong>No-Speech Prob:</strong> ${noSpeechProb}\n` +
+            `<strong>Avg Logprob:</strong> ${avgLogprob}\n\n` +
+            `<strong>Full Response:</strong>\n${JSON.stringify(data, null, 2)}`;
+        } else {
+          status.innerHTML = '<span class="error">❌ Whisper API error</span>';
+          resultBox.textContent = `Status: ${res.status}\n${raw}`;
+        }
+      } catch (err) {
+        status.innerHTML = `<span class="error">❌ Error: ${err.message}</span>`;
+      }
+    }
+
+    async function injectFakeMic() {
+      const status = document.getElementById('injectStatus');
+      const frameBox = document.getElementById('kioskFrame');
+      const iframe = document.getElementById('kioskIframe');
+
+      status.textContent = 'Loading audio into fake microphone stream...';
+
+      try {
+        const audioRes = await fetch('assets/chinese-test.mp3');
+        const arrayBuffer = await audioRes.arrayBuffer();
+        const audioCtx = new AudioContext();
+        const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+
+        // Create a fake getUserMedia that returns a stream playing our audio file
+        const fakeGetUserMedia = async (constraints) => {
+          const dest = audioCtx.createMediaStreamDestination();
+          const source = audioCtx.createBufferSource();
+          source.buffer = audioBuffer;
+          source.loop = true;
+          source.connect(dest);
+          source.start(0);
+
+          // Add a small delay before starting so VAD can settle
+          setTimeout(() => {
+            source.stop();
+            // Restart after a brief pause to simulate natural speech gaps
+            setTimeout(() => {
+              const s2 = audioCtx.createBufferSource();
+              s2.buffer = audioBuffer;
+              s2.loop = true;
+              s2.connect(dest);
+              s2.start(0);
+            }, 500);
+          }, audioBuffer.duration * 1000 + 200);
+
+          return dest.stream;
+        };
+
+        // Build the iframe with monkey-patched getUserMedia
+        const kioskHtml = await (await fetch('index-bithuman.html')).text();
+        const patchedHtml = kioskHtml.replace(
+          '<script>',
+          `<script>
+            navigator.mediaDevices.getUserMedia = ${fakeGetUserMedia.toString()};
+            console.log('[Test] Fake microphone injected');
+          `
+        );
+
+        const blob = new Blob([patchedHtml], { type: 'text/html' });
+        iframe.src = URL.createObjectURL(blob);
+        frameBox.style.display = 'block';
+        status.innerHTML = '<span class="success">✅ Fake mic injected. Kiosk loaded below. Click "Chat with me" to start.</span>';
+      } catch (err) {
+        status.innerHTML = `<span class="error">❌ Error: ${err.message}</span>`;
+      }
+    }
+  </script>
+</body>
+</html>

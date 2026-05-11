@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>LiveKit Debug</title>
+<style>
+  body { font-family: monospace; padding: 20px; background: #1a1a2e; color: #0f0; }
+  #log { white-space: pre-wrap; line-height: 1.6; }
+  .error { color: #f44; }
+  .info { color: #ff0; }
+</style>
+</head>
+<body>
+<h2>LiveKit Connection Debug</h2>
+<div id="log"></div>
+<script src="https://cdn.jsdelivr.net/npm/livekit-client@2.11.0/dist/livekit-client.umd.min.js"></script>
+<script>
+function log(msg, cls) {
+  const el = document.getElementById('log');
+  const line = document.createElement('div');
+  line.className = cls || '';
+  line.textContent = '[' + new Date().toLocaleTimeString() + '] ' + msg;
+  el.appendChild(line);
+}
+
+async function run() {
+  log('Page loaded');
+  
+  // Wait for SDK
+  let attempts = 0;
+  while (typeof LivekitClient === 'undefined' && attempts < 50) {
+    await new Promise(r => setTimeout(r, 100));
+    attempts++;
+  }
+  
+  if (typeof LivekitClient === 'undefined') {
+    log('ERROR: LiveKit SDK not loaded after 5s', 'error');
+    return;
+  }
+  log('LiveKit SDK loaded. Version: ' + (LivekitClient.version || 'unknown'));
+  log('Room class: ' + (typeof LivekitClient.Room));
+  log('RoomEvent: ' + (typeof LivekitClient.RoomEvent));
+
+  // Get token
+  log('Fetching token...');
+  try {
+    const r = await fetch('http://127.0.0.1:8082/token?identity=debug&room=kiosk-room');
+    log('Token response status: ' + r.status);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const data = await r.json();
+    log('Token received (' + data.token.length + ' chars)');
+
+    // Connect
+    log('Creating Room...');
+    const room = new LivekitClient.Room({ adaptiveStream: true });
+    
+    room.on(LivekitClient.RoomEvent.ConnectionStateChanged, (state) => {
+      log('State: ' + state, 'info');
+    });
+    
+    room.on(LivekitClient.RoomEvent.Connected, () => {
+      log('CONNECTED!', 'info');
+      log('Room: ' + room.name);
+      log('Participants: ' + Array.from(room.remoteParticipants.values()).map(p => p.identity).join(', '));
+    });
+    
+    room.on(LivekitClient.RoomEvent.Disconnected, (reason) => {
+      log('DISCONNECTED: ' + JSON.stringify(reason), 'error');
+    });
+    
+    room.on(LivekitClient.RoomEvent.TrackSubscribed, (track, pub, participant) => {
+      log('Track: ' + track.kind + ' from ' + participant.identity, 'info');
+    });
+    
+    log('Connecting to wss://4015-118-68-100-183.ngrok-free.app...');
+    await room.connect('wss://4015-118-68-100-183.ngrok-free.app', data.token);
+    log('connect() returned');
+    
+    // Wait a bit to see if agent joins
+    await new Promise(r => setTimeout(r, 8000));
+    log('Participants after 8s: ' + Array.from(room.remoteParticipants.values()).map(p => p.identity).join(', '));
+    
+  } catch (err) {
+    log('ERROR: ' + err.message, 'error');
+    log(err.stack, 'error');
+  }
+}
+
+run();
+</script>
+</body>
+</html>
