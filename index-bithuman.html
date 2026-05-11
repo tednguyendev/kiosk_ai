@@ -565,7 +565,7 @@ function App() {
   const [generatingVoice, setGeneratingVoice] = useState(false);
   const [bithumanConnected, setBithumanConnected] = useState(false);
   const [videoReady, setVideoReady] = useState(false);
-  const [streamKey, setStreamKey] = useState(0);
+  const [streamKey, setStreamKey] = useState(Date.now());
   const [bithumanStatus, setBithumanStatus] = useState("Initializing...");
   const [filtered, setFiltered] = useState(false);
   const [recommendations, setRecommendations] = useState([]);
@@ -669,7 +669,6 @@ function App() {
                 if (cancelled) return;
                 setBithumanConnected(true);
                 bithumanConnectedRef.current = true;
-                setVideoReady(true);
                 setBithumanStatus("Connected! Speak to Kimberly...");
                 if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
 
@@ -678,7 +677,9 @@ function App() {
                   if (cancelled) return;
                   const ws = new WebSocket(`${BITHUMAN_LOCAL_URL.replace('http', 'ws')}/ws/audio`);
                   ws.binaryType = 'arraybuffer';
-                  ws.onopen = () => console.log('[Audio WS] connected');
+                  ws.onopen = () => {
+                    console.log('[Audio WS] connected');
+                  };
                   ws.onmessage = (e) => {
                     if (e.data instanceof ArrayBuffer) {
                       playAudioChunk(new DataView(e.data));
@@ -687,6 +688,9 @@ function App() {
                   ws.onclose = () => {
                     console.log('[Audio WS] closed — reconnecting in 2s');
                     audioWsRef.current = null;
+                    setBithumanConnected(false);
+                    bithumanConnectedRef.current = false;
+                    setVideoReady(false);
                     setTimeout(connectAudioWs, 2000);
                   };
                   ws.onerror = (err) => console.error('[Audio WS] error:', err);
@@ -712,7 +716,12 @@ function App() {
               }
             }
           } catch (err) {
-            if (!cancelled) setBithumanStatus("Waiting for local server... (start: python bithuman-server/kiosk_server.py)");
+            if (!cancelled) {
+              setBithumanStatus("Waiting for local server... (start: python bithuman-server/kiosk_server.py)");
+              setBithumanConnected(false);
+              bithumanConnectedRef.current = false;
+              setVideoReady(false);
+            }
           }
         };
 
@@ -970,22 +979,29 @@ function App() {
         transition: "all 0.3s",
         background: "#000",
       }}>
-        {videoReady && (
-          <img
-            key={`stream-${streamKey}`}
-            src={`${BITHUMAN_LOCAL_URL}/stream?t=${streamKey}`}
-            alt="Kimberly"
-            style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "top", display: "block" }}
-            onLoad={() => console.log('[Avatar] MJPEG stream loaded')}
-            onError={() => {
-              console.log('[Avatar] MJPEG stream error — reconnecting in 2s');
-              setTimeout(() => setStreamKey(k => k + 1), 2000);
-            }}
-          />
-        )}
+        {/* MJPEG stream — always render, reconnect on error */}
+        <img
+          key={`stream-${streamKey}`}
+          src={`${BITHUMAN_LOCAL_URL}/stream?t=${streamKey}`}
+          alt="Kimberly"
+          style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center top", display: "block" }}
+          onLoad={() => {
+            console.log('[Avatar] MJPEG stream loaded');
+            setVideoReady(true);
+          }}
+          onError={() => {
+            console.log('[Avatar] MJPEG stream error — reconnecting in 3s');
+            setVideoReady(false);
+            setBithumanConnected(false);
+            bithumanConnectedRef.current = false;
+            setTimeout(() => setStreamKey(k => k + 1), 3000);
+          }}
+        />
+        {/* Loading overlay until stream renders */}
         {!videoReady && (
           <div style={{
-            position: "absolute", inset: 0, display: "flex", flexDirection: "column",
+            position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
+            display: "flex", flexDirection: "column",
             alignItems: "center", justifyContent: "center",
             background: "linear-gradient(180deg, #f4e6d0 0%, #e8d4b0 100%)",
           }}>
