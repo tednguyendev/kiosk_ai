@@ -612,8 +612,8 @@ function App() {
     if (!audioCtxRef.current) return;
     const ctx = audioCtxRef.current;
 
-    // Wait until we have ~200ms buffered before starting playback
-    if (!audioQueueRunningRef.current && audioQueueRef.current.length >= 5) {
+    // Wait until we have ~400ms buffered before starting playback
+    if (!audioQueueRunningRef.current && audioQueueRef.current.length >= 10) {
       audioQueueRunningRef.current = true;
       audioQueueTimeRef.current = ctx.currentTime + 0.1;
     }
@@ -716,10 +716,8 @@ function App() {
                     console.log('[Audio WS] connected');
                   };
                   ws.onmessage = (e) => {
-                    // Audio is now played directly from MP3 URL for quality.
-                    // We keep the WS connected for health/backwards-compat but ignore audio chunks.
                     if (e.data instanceof ArrayBuffer) {
-                      // playAudioChunk(new DataView(e.data)); // disabled — direct MP3 playback
+                      playAudioChunk(new DataView(e.data));
                     }
                   };
                   ws.onclose = () => {
@@ -803,25 +801,10 @@ function App() {
         return;
       }
 
-      // Play high-quality audio directly from the MP3 URL.
-      // Delay ~400ms so the bithuman runtime has time to generate lip-sync frames.
+      // WebSocket audio is now used for perfect sync.
+      // The MP3 URL is kept for fallback / diagnostics.
       if (data.audio_url) {
-        const audio = new Audio(`${BITHUMAN_LOCAL_URL}${data.audio_url}`);
-        audio.onplay = () => {
-          perf.speakStart = performance.now();
-          console.log('[bitHuman] audio playing');
-        };
-        audio.onended = () => {
-          setSpeaking(false);
-          speakLockRef.current = false;
-          console.log('[bitHuman] audio ended');
-        };
-        audio.onerror = (e) => {
-          console.error('[bitHuman] audio error:', e);
-          setSpeaking(false);
-          speakLockRef.current = false;
-        };
-        setTimeout(() => audio.play(), 400);
+        console.log('[bitHuman] audio_url ready:', data.audio_url);
       }
 
       setGeneratingVoice(false);
