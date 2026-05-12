@@ -23,6 +23,7 @@ import tempfile
 import glob
 import time
 
+import numpy as np
 from openai import AsyncOpenAI
 from aiohttp import web
 from aiohttp.web_middlewares import middleware
@@ -199,6 +200,11 @@ document.getElementById('textInput').addEventListener('keydown', (e) => {
 
             audio_float, sample_rate = load_audio(tmp_mp3, target_sr=16000)
             os.unlink(tmp_mp3)
+
+            # TTS audio is "too clean" — add tiny dithering noise so the
+            # lip-sync mel spectrogram doesn't produce NaNs / glitches.
+            audio_float += np.random.normal(0, 1e-4, audio_float.shape).astype(np.float32)
+            np.clip(audio_float, -1.0, 1.0, out=audio_float)
 
             audio_int16 = float32_to_int16(audio_float)
             duration = len(audio_int16) / sample_rate
