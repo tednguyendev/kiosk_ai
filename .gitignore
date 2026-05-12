@@ -6,3 +6,4 @@
 bithuman-server/avatar.imx
 bithuman-server/*.log
 bithuman-server/venv/
+bithuman-server/tts_output/
