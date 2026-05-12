@@ -345,7 +345,7 @@ function useVoiceActivity({ enabled, paused, onUtterance, onRejected }) {
     async function start() {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
         });
         if (cancelled) { stream.getTracks().forEach(t => t.stop()); return; }
         streamRef.current = stream;
