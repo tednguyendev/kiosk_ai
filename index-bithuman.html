@@ -342,7 +342,7 @@ function useVoiceActivity({ enabled, paused, onUtterance, onRejected }) {
     async function start() {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+          audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
         });
         if (cancelled) { stream.getTracks().forEach(t => t.stop()); return; }
         streamRef.current = stream;
@@ -688,9 +688,8 @@ function App() {
                   ws.onclose = () => {
                     console.log('[Audio WS] closed — reconnecting in 2s');
                     audioWsRef.current = null;
-                    setBithumanConnected(false);
-                    bithumanConnectedRef.current = false;
-                    setVideoReady(false);
+                    // Only reconnect audio; don't flip global connected state.
+                    // If the server is truly down the health check will catch it.
                     setTimeout(connectAudioWs, 2000);
                   };
                   ws.onerror = (err) => console.error('[Audio WS] error:', err);
@@ -990,11 +989,11 @@ function App() {
             setVideoReady(true);
           }}
           onError={() => {
-            console.log('[Avatar] MJPEG stream error — reconnecting in 3s');
+            console.log('[Avatar] MJPEG stream error — reconnecting in 1s');
             setVideoReady(false);
-            setBithumanConnected(false);
-            bithumanConnectedRef.current = false;
-            setTimeout(() => setStreamKey(k => k + 1), 3000);
+            // Don't touch bithumanConnected here — health check is the authority.
+            // Just bump streamKey so React remounts the <img> and retries.
+            setTimeout(() => setStreamKey(k => k + 1), 1000);
           }}
         />
         {/* Loading overlay until stream renders */}

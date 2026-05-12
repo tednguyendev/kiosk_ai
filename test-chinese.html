@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chinese Speech Test — Kopitiam Kiosk</title>
+<style>
+body { font-family: 'Inter', system-ui, sans-serif; background: #f5f5f5; padding: 40px; max-width: 800px; margin: 0 auto; }
+h1 { color: #CF463A; }
+button { padding: 12px 24px; font-size: 16px; border: none; border-radius: 8px; cursor: pointer; background: #CF463A; color: white; margin: 8px 0; }
+button:hover { opacity: 0.9; }
+button:disabled { background: #ccc; cursor: not-allowed; }
+pre { background: #1e1e1e; color: #d4d4d4; padding: 16px; border-radius: 8px; overflow-x: auto; font-size: 14px; }
+.section { background: white; padding: 24px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+.status { color: #666; font-style: italic; margin-top: 8px; }
+</style>
+</head>
+<body>
+<h1>🎤 Chinese Speech Test</h1>
+
+<div class="section">
+  <h3>1. Play Pre-generated Chinese Audio</h3>
+  <p>This plays a Chinese phrase through your speakers so the kiosk mic can pick it up:</p>
+  <audio id="audioPlayer" controls src="assets/chinese-test.mp3"></audio>
+  <div class="status" id="playStatus"></div>
+</div>
+
+<div class="section">
+  <h3>2. Direct Whisper API Test</h3>
+  <p>Send the Chinese audio directly to OpenAI Whisper and see the transcription:</p>
+  <button id="whisperBtn" onclick="testWhisper()">Test Whisper (Chinese)</button>
+  <div class="status" id="whisperStatus"></div>
+  <pre id="whisperResult">Result will appear here...</pre>
+</div>
+
+<div class="section">
+  <h3>3. Full Pipeline Test</h3>
+  <p>Send the Chinese audio through Whisper → Gemini → Avatar:</p>
+  <button id="pipelineBtn" onclick="testPipeline()">Test Full Pipeline</button>
+  <div class="status" id="pipelineStatus"></div>
+  <pre id="pipelineResult">Result will appear here...</pre>
+</div>
+
+<div class="section">
+  <h3>4. Fake Mic Injection</h3>
+  <p>Programmatically inject the Chinese audio into the kiosk's mic stream (bypasses physical speakers):</p>
+  <button id="injectBtn" onclick="injectAudio()">Inject to Kiosk Mic</button>
+  <div class="status" id="injectStatus"></div>
+</div>
+
+<script>
+const OPENAI_KEY = window.__CONFIG?.OPENAI_API_KEY || 'YOUR_OPENAI_API_KEY';
+const GEMINI_KEY = window.__CONFIG?.GEMINI_API_KEY || 'AIzaSyAHCe88d2e8jrApLX9KKyaKEyU-ZJx9a54';
+
+async function fetchAudioBlob() {
+  const res = await fetch('assets/chinese-test.mp3');
+  return await res.blob();
+}
+
+async function testWhisper() {
+  const btn = document.getElementById('whisperBtn');
+  const status = document.getElementById('whisperStatus');
+  const result = document.getElementById('whisperResult');
+  btn.disabled = true;
+  status.textContent = 'Uploading to Whisper...';
+
+  try {
+    const blob = await fetchAudioBlob();
+    const form = new FormData();
+    form.append('file', blob, 'chinese-test.mp3');
+    form.append('model', 'whisper-1');
+    form.append('language', 'zh');
+
+    const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + OPENAI_KEY },
+      body: form
+    });
+    const data = await res.json();
+    result.textContent = JSON.stringify(data, null, 2);
+    status.textContent = data.text ? '✅ Transcribed: ' + data.text : '❌ Error';
+  } catch (e) {
+    result.textContent = 'Error: ' + e.message;
+    status.textContent = '❌ Failed';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function testPipeline() {
+  const btn = document.getElementById('pipelineBtn');
+  const status = document.getElementById('pipelineStatus');
+  const result = document.getElementById('pipelineResult');
+  btn.disabled = true;
+  status.textContent = 'Running Whisper → Gemini → Avatar...';
+
+  try {
+    // Step 1: Whisper
+    const blob = await fetchAudioBlob();
+    const form = new FormData();
+    form.append('file', blob, 'chinese-test.mp3');
+    form.append('model', 'whisper-1');
+    form.append('language', 'zh');
+    const whisperRes = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + OPENAI_KEY },
+      body: form
+    });
+    const whisperData = await whisperRes.json();
+    const userText = whisperData.text || '';
+
+    // Step 2: Gemini
+    status.textContent = 'Whisper: "' + userText + '" → Gemini...';
+    const geminiRes = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + GEMINI_KEY, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{
+          parts: [{
+            text: 'You are Kimberly, AI concierge at Kopitiam Food Court at Tan Tock Seng Hospital. The user said (in Chinese): ' + userText + '\n\nRespond in Chinese. Be friendly and warm. Recommend exactly ONE stall and ONE dish. Mention the stall number.'
+          }]
+        }]
+      })
+    });
+    const geminiData = await geminiRes.json();
+    const reply = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || 'No response';
+
+    // Step 3: Avatar speak
+    status.textContent = 'Gemini replied → Sending to avatar...';
+    const speakRes = await fetch('http://localhost:3001/speak-text', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: reply })
+    });
+    const speakData = await speakRes.json();
+
+    result.textContent = JSON.stringify({
+      user_text: userText,
+      gemini_reply: reply,
+      avatar_response: speakData
+    }, null, 2);
+    status.textContent = '✅ Pipeline complete!';
+  } catch (e) {
+    result.textContent = 'Error: ' + e.message;
+    status.textContent = '❌ Failed';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function injectAudio() {
+  const btn = document.getElementById('injectBtn');
+  const status = document.getElementById('injectStatus');
+  btn.disabled = true;
+  status.textContent = 'Loading audio...';
+
+  try {
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+    const blob = await fetchAudioBlob();
+    const arrayBuffer = await blob.arrayBuffer();
+    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+
+    // Create a stream from the decoded audio
+    const source = audioContext.createBufferSource();
+    source.buffer = audioBuffer;
+    const dest = audioContext.createMediaStreamDestination();
+    source.connect(dest);
+    source.start();
+
+    status.textContent = 'Audio injected into MediaStream. Connect this stream to the kiosk mic input.';
+    window.injectedStream = dest.stream;
+  } catch (e) {
+    status.textContent = '❌ Error: ' + e.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+</script>
+</body>
+</html>

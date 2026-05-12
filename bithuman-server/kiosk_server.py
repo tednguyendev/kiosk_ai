@@ -3,9 +3,9 @@ bitHuman Kiosk Server
 Subclasses the built-in StreamServer to add a /speak-text endpoint
 that generates TTS and drives the local avatar for lip-sync.
 
-TTS: Microsoft Edge TTS (free, high-quality neural voices)
-  - English: en-SG-LunaNeural  (Singapore English ~ Malaysian)
-  - Chinese: zh-CN-XiaoxiaoNeural
+TTS: OpenAI TTS (high-quality neural voices)
+  - Model: tts-1-hd
+  - Voice: alloy (natural, gender-neutral, multilingual)
   - Auto-detects language from text
 
 Endpoints:
@@ -21,10 +21,11 @@ import asyncio
 import os
 import tempfile
 
-import edge_tts
+from openai import AsyncOpenAI
 from aiohttp import web
 from aiohttp.web_middlewares import middleware
 
+from bithuman import AsyncBithuman
 from bithuman.stream_server import StreamServer, float32_to_int16, load_audio
 
 
@@ -43,14 +44,15 @@ async def cors_middleware(request, handler):
 
 
 # ─── Config ───
-API_SECRET = "dOIQCNkA6HbqHDvh5JqzKIhr1Cku48P4SzLBlXicA39XED7vdUDFPBh3lMCbt37Gy"
+API_SECRET = "W8OWvGKO9P0kdF8dU2YBcPHKIw5iegMGSP8FvvGHFVlvdZAT1MQvB2ICDGsRg2ZHE"
 MODEL_PATH = "avatar.imx"
 HOST = "0.0.0.0"
 PORT = 3001
 
-# Edge TTS voices
-VOICE_EN = "en-SG-LunaNeural"      # Singapore English (closest to Malaysian)
-VOICE_ZH = "zh-CN-XiaoxiaoNeural"  # Chinese (Mainland)
+OPENAI_API_KEY = "YOUR_OPENAI_API_KEY"
+OPENAI_VOICE = "alloy"   # alloy, echo, fable, onyx, nova, shimmer
+
+openai_client = AsyncOpenAI(api_key=OPENAI_API_KEY)
 
 
 def detect_language(text: str) -> str:
@@ -61,7 +63,7 @@ def detect_language(text: str) -> str:
 
 
 class KioskServer(StreamServer):
-    """StreamServer extended with Edge TTS text-to-speech."""
+    """StreamServer extended with OpenAI TTS text-to-speech."""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -72,6 +74,21 @@ class KioskServer(StreamServer):
         app.router.add_get("/viewer", self._handle_kiosk_viewer)
         app.router.add_post("/speak-text", self._handle_speak_text)
         return app
+
+    async def _init_runtime(self) -> None:
+        """Override to reduce queued output frames (default 6 → 2)."""
+        self._runtime = await AsyncBithuman.create(
+            model_path=self.model_path,
+            api_secret=self.api_key,
+            output_buffer_size=2,  # fewer queued frames = slower leak
+        )
+        # Tune idle behavior for live streaming preview.
+        script = self._runtime.video_graph.videos_script
+        script.BACK_TO_IDLE = 2
+        for action in script.idle_actions:
+            action.interval = (5.0, 15.0)
+        script.set_next_idle_action()
+        await self._runtime.start()
 
     # ─── Kiosk Viewer ───
 
@@ -135,7 +152,7 @@ document.getElementById('textInput').addEventListener('keydown', (e) => {
     # ─── Text-to-Speech endpoint ───
 
     async def _handle_speak_text(self, request: web.Request) -> web.Response:
-        """POST /speak-text — accept JSON {text}, generate Edge TTS, feed to runtime."""
+        """POST /speak-text — accept JSON {text}, generate OpenAI TTS, feed to runtime."""
         if self._runtime is None:
             return web.json_response(
                 {"error": "Runtime not initialized"}, status=503
@@ -150,17 +167,24 @@ document.getElementById('textInput').addEventListener('keydown', (e) => {
         if not text:
             return web.json_response({"error": "No text provided"}, status=400)
 
-        # 1. Detect language and pick voice
         lang = detect_language(text)
-        voice = VOICE_ZH if lang == "zh" else VOICE_EN
-        print(f"[TTS] lang={lang}, voice={voice}, text={text[:50]}...")
+        print(f"[TTS] lang={lang}, text={text[:60]}...")
 
-        # 2. Generate TTS via Edge TTS
         try:
+            # 1. Generate TTS via OpenAI
+            response = await openai_client.audio.speech.create(
+                model="tts-1-hd",
+                voice=OPENAI_VOICE,
+                input=text,
+                response_format="mp3",
+                speed=1.0,
+            )
+
+            # 2. Save MP3 to temp file
             fd, tmp_mp3 = tempfile.mkstemp(suffix=".mp3")
             os.close(fd)
-            communicate = edge_tts.Communicate(text, voice)
-            await communicate.save(tmp_mp3)
+            with open(tmp_mp3, "wb") as f:
+                f.write(response.content)
 
             # 3. Load MP3 → PCM int16
             audio_float, sample_rate = load_audio(tmp_mp3, target_sr=16000)
@@ -184,7 +208,8 @@ document.getElementById('textInput').addEventListener('keydown', (e) => {
                 "duration_seconds": round(duration, 2),
                 "samples": len(audio_int16),
                 "lang": lang,
-                "voice": voice,
+                "voice": OPENAI_VOICE,
+                "tts": "openai",
             })
 
         except Exception as e:
