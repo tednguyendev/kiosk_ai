@@ -803,7 +803,8 @@ function App() {
         return;
       }
 
-      // Play high-quality audio directly from the MP3 URL
+      // Play high-quality audio directly from the MP3 URL.
+      // Delay ~400ms so the bithuman runtime has time to generate lip-sync frames.
       if (data.audio_url) {
         const audio = new Audio(`${BITHUMAN_LOCAL_URL}${data.audio_url}`);
         audio.onplay = () => {
@@ -820,7 +821,7 @@ function App() {
           setSpeaking(false);
           speakLockRef.current = false;
         };
-        audio.play();
+        setTimeout(() => audio.play(), 400);
       }
 
       setGeneratingVoice(false);
