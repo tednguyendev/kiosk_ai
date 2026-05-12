@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>TTS Quality Test</title></head>
+<body style="font-family:sans-serif; padding:40px; max-width:600px; margin:0 auto;">
+<h2>🔊 TTS Quality Test</h2>
+
+<h3>1. Raw OpenAI TTS (direct MP3)</h3>
+<audio controls src="assets/kimberly-raw-test.mp3"></audio>
+<p>This plays the raw MP3 from OpenAI. Does it sound good?</p>
+
+<h3>2. Pipeline TTS (via bithuman)</h3>
+<button id="speakBtn">Speak through avatar</button>
+<p id="status"></p>
+
+<h3>3. Different Voices</h3>
+<button onclick="testVoice('alloy')">Test alloy</button>
+<button onclick="testVoice('nova')">Test nova</button>
+<button onclick="testVoice('shimmer')">Test shimmer</button>
+<button onclick="testVoice('echo')">Test echo</button>
+<p id="voiceStatus"></p>
+<audio id="voicePlayer" controls></audio>
+
+<script>
+// Audio WebSocket for hearing the avatar
+const SR = 16000;
+let ctx, nextTime = 0;
+function ensureCtx() {
+  if (!ctx) ctx = new AudioContext({ sampleRate: SR });
+  if (ctx.state === 'suspended') ctx.resume();
+}
+function connectAudio() {
+  ensureCtx();
+  const ws = new WebSocket('ws://localhost:3001/ws/audio');
+  ws.binaryType = 'arraybuffer';
+  ws.onmessage = function(e) {
+    if (!ctx || ctx.state === 'closed') return;
+    const int16 = new Int16Array(e.data);
+    const float32 = new Float32Array(int16.length);
+    for (let i = 0; i < int16.length; i++) float32[i] = int16[i] / 32768;
+    const buf = ctx.createBuffer(1, float32.length, SR);
+    buf.getChannelData(0).set(float32);
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.connect(ctx.destination);
+    const now = ctx.currentTime;
+    if (nextTime < now) nextTime = now;
+    src.start(nextTime);
+    nextTime += buf.duration;
+  };
+  ws.onclose = function() { setTimeout(connectAudio, 1000); };
+}
+connectAudio();
+
+document.getElementById('speakBtn').addEventListener('click', async () => {
+  const status = document.getElementById('status');
+  status.textContent = 'Generating...';
+  try {
+    const res = await fetch('http://localhost:3001/speak-text', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: 'Hello, welcome to Kopitiam! My name is Kimberly.' })
+    });
+    const data = await res.json();
+    status.textContent = data.status === 'ok' ? '✅ Speaking!' : '❌ Error: ' + data.error;
+  } catch (e) {
+    status.textContent = '❌ Error: ' + e.message;
+  }
+});
+
+async function testVoice(voice) {
+  const status = document.getElementById('voiceStatus');
+  const player = document.getElementById('voicePlayer');
+  status.textContent = 'Generating ' + voice + '...';
+  try {
+    const res = await fetch('https://api.openai.com/v1/audio/speech', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer YOUR_OPENAI_API_KEY',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'tts-1-hd',
+        voice: voice,
+        input: 'Hello, welcome to Kopitiam! My name is Kimberly.',
+        response_format: 'mp3'
+      })
+    });
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    player.src = url;
+    player.play();
+    status.textContent = '▶️ Playing ' + voice;
+  } catch (e) {
+    status.textContent = '❌ Error: ' + e.message;
+  }
+}
+</script>
+</body>
+</html>

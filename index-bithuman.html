@@ -599,25 +599,56 @@ function App() {
     }
   }
 
+  // ─── Jitter-smooth audio playback ───
+  const audioQueueRef = useRef([]);
+  const audioQueueRunningRef = useRef(false);
+  const audioQueueTimeRef = useRef(0);
+
+  function processAudioQueue() {
+    if (!audioCtxRef.current) return;
+    const ctx = audioCtxRef.current;
+
+    // Wait until we have ~200ms buffered before starting playback
+    if (!audioQueueRunningRef.current && audioQueueRef.current.length >= 5) {
+      audioQueueRunningRef.current = true;
+      audioQueueTimeRef.current = ctx.currentTime + 0.1;
+    }
+
+    if (audioQueueRunningRef.current) {
+      // Schedule up to 500ms ahead
+      while (audioQueueRef.current.length > 0 && audioQueueTimeRef.current < ctx.currentTime + 0.5) {
+        const pcmBytes = audioQueueRef.current.shift();
+        const int16 = new Int16Array(pcmBytes.buffer, pcmBytes.byteOffset, pcmBytes.byteLength / 2);
+        const float32 = new Float32Array(int16.length);
+        for (let i = 0; i < int16.length; i++) {
+          float32[i] = int16[i] / 32768.0;
+        }
+        const buffer = ctx.createBuffer(1, float32.length, 16000);
+        buffer.getChannelData(0).set(float32);
+        const source = ctx.createBufferSource();
+        source.buffer = buffer;
+        source.connect(ctx.destination);
+
+        if (audioQueueTimeRef.current < ctx.currentTime) {
+          audioQueueTimeRef.current = ctx.currentTime;
+        }
+        source.start(audioQueueTimeRef.current);
+        audioQueueTimeRef.current += buffer.duration;
+      }
+      if (audioQueueRef.current.length === 0) {
+        audioQueueRunningRef.current = false;
+      }
+    }
+
+    requestAnimationFrame(processAudioQueue);
+  }
+
   function playAudioChunk(pcmBytes) {
     ensureAudioContext();
-    const ctx = audioCtxRef.current;
-    const int16 = new Int16Array(pcmBytes.buffer, pcmBytes.byteOffset, pcmBytes.byteLength / 2);
-    const float32 = new Float32Array(int16.length);
-    for (let i = 0; i < int16.length; i++) {
-      float32[i] = int16[i] / 32768.0;
+    audioQueueRef.current.push(pcmBytes);
+    if (audioQueueRef.current.length === 1) {
+      requestAnimationFrame(processAudioQueue);
     }
-    const buffer = ctx.createBuffer(1, float32.length, 16000);
-    buffer.getChannelData(0).set(float32);
-    const source = ctx.createBufferSource();
-    source.buffer = buffer;
-    source.connect(ctx.destination);
-
-    if (nextAudioTimeRef.current < ctx.currentTime) {
-      nextAudioTimeRef.current = ctx.currentTime;
-    }
-    source.start(nextAudioTimeRef.current);
-    nextAudioTimeRef.current += buffer.duration;
   }
 
   // Extract recommended stalls from AI response (order-preserving, stall numbers only)
@@ -681,8 +712,10 @@ function App() {
                     console.log('[Audio WS] connected');
                   };
                   ws.onmessage = (e) => {
+                    // Audio is now played directly from MP3 URL for quality.
+                    // We keep the WS connected for health/backwards-compat but ignore audio chunks.
                     if (e.data instanceof ArrayBuffer) {
-                      playAudioChunk(new DataView(e.data));
+                      // playAudioChunk(new DataView(e.data)); // disabled — direct MP3 playback
                     }
                   };
                   ws.onclose = () => {
@@ -743,6 +776,8 @@ function App() {
   }, [started]);
 
   // ─── bitHuman speak: send text to local server ───
+  // Audio is played directly from the returned MP3 URL for quality.
+  // The runtime still receives the audio for lip-sync video.
   async function speakWithBitHuman(text) {
     if (speakLockRef.current) { console.log('[bitHuman] speak locked, skipping:', text.slice(0, 40)); return; }
     speakLockRef.current = true;
@@ -759,14 +794,43 @@ function App() {
       console.log('[bitHuman] speak response:', data);
       if (data.status !== 'ok') {
         console.error('[bitHuman] speak error:', data.error);
+        setGeneratingVoice(false);
+        speakLockRef.current = false;
+        return;
       }
+
+      // Play high-quality audio directly from the MP3 URL
+      if (data.audio_url) {
+        const audio = new Audio(`${BITHUMAN_LOCAL_URL}${data.audio_url}`);
+        audio.onplay = () => {
+          perf.speakStart = performance.now();
+          console.log('[bitHuman] audio playing');
+        };
+        audio.onended = () => {
+          setSpeaking(false);
+          speakLockRef.current = false;
+          console.log('[bitHuman] audio ended');
+        };
+        audio.onerror = (e) => {
+          console.error('[bitHuman] audio error:', e);
+          setSpeaking(false);
+          speakLockRef.current = false;
+        };
+        audio.play();
+      }
+
       setGeneratingVoice(false);
       setSpeaking(true);
+      // Keep the visual speaking state in sync even if audio events fail
       const durationMs = data.duration_seconds ? Math.max(1000, data.duration_seconds * 1000) : Math.max(2000, text.length * 150);
-      setTimeout(() => { setSpeaking(false); speakLockRef.current = false; }, durationMs);
+      setTimeout(() => {
+        setSpeaking(false);
+        speakLockRef.current = false;
+      }, durationMs + 500);
     } catch (err) {
       console.error('[bitHuman] speak error:', err);
       speakLockRef.current = false;
+      setGeneratingVoice(false);
       setSpeaking(false);
       // Fallback: browser TTS
       try {
