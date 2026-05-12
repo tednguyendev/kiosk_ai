@@ -240,10 +240,10 @@ async function transcribeAudio(audioBlob) {
 }
 
 // Whisper confidence thresholds — flag hallucinations Whisper itself is unsure about.
-// no_speech_prob > 0.6: Whisper thinks this segment was actually silence.
-// avg_logprob < -1.0: low per-token confidence, usually noise-to-text guesses.
-const WHISPER_NO_SPEECH_THRESHOLD = 0.6;
-const WHISPER_LOGPROB_THRESHOLD = -1.0;
+// no_speech_prob > 0.7: Whisper thinks this segment was actually silence.
+// avg_logprob < -1.2: low per-token confidence, usually noise-to-text guesses.
+const WHISPER_NO_SPEECH_THRESHOLD = 0.7;
+const WHISPER_LOGPROB_THRESHOLD = -1.2;
 
 // Known Whisper hallucinations. Substring match (normalized) — Whisper often concatenates these into longer sentences.
 const WHISPER_HALLUCINATION_SUBSTRINGS = [
@@ -274,7 +274,10 @@ function isHallucination(text, detectedLang) {
   // URLs or domain names — food-court customers don't say these aloud
   if (/\b(?:https?:\/\/|www\.|\.com|\.org|\.net|\.io)\b/i.test(text)) return true;
   // Non-ASCII in English context = likely hallucination
-  if (/[^\x00-\x7F]/.test(text)) return true;
+  // Relaxed: allow common non-ASCII punctuation (curly quotes, em-dash, etc.)
+  // Only flag if the text is MOSTLY non-ASCII in an English context
+  const nonAsciiCount = (text.match(/[^\x00-\x7F]/g) || []).length;
+  if (nonAsciiCount > text.length * 0.3) return true;
   return false;
 }
 
@@ -441,7 +444,8 @@ function useVoiceActivity({ enabled, paused, onUtterance, onRejected }) {
               const reason = !clean ? 'empty' : lowConfidence ? 'low-confidence' : 'hallucination';
               console.log('[VAD] rejected (' + reason + '):', JSON.stringify(clean));
               committedRef.current = false;
-              if (onRejectedRef.current) onRejectedRef.current(reason);
+              // Still show the transcribed text in chat so the user knows what happened
+              if (onRejectedRef.current) onRejectedRef.current(reason, clean);
             }
           } catch (err) {
             console.error("Whisper error:", err);
@@ -860,8 +864,17 @@ function App() {
     if (sendToAgentRef.current) sendToAgentRef.current(text);
   }, []);
 
-  const handleRejected = useCallback((reason) => {
+  const handleRejected = useCallback((reason, text) => {
     const isZh = activeFiltersRef.current.language === 'zh';
+    // Show the rejected text in chat so the user sees what was transcribed
+    if (text && text.trim()) {
+      setMessages(prev => [...prev, {
+        role: 'user',
+        content: text,
+        rejected: true,
+        rejectReason: reason
+      }]);
+    }
     const msg = reason === 'error'
       ? (isZh ? '无法连接语音识别 — 请重试？' : "Couldn't reach Whisper — try again?")
       : reason === 'empty'
@@ -1116,12 +1129,15 @@ function App() {
           {messages.map((msg, i) => (
             msg.role === 'user' ? (
               <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
-                <div style={{ fontWeight: 600, fontSize: 30, color: "#555", marginBottom: 8, marginRight: 8 }}>You</div>
+                <div style={{ fontWeight: 600, fontSize: 30, color: "#555", marginBottom: 8, marginRight: 8 }}>
+                  {msg.rejected ? 'You (?)' : 'You'}
+                </div>
                 <div style={{
-                  background: RED,
+                  background: msg.rejected ? "rgba(207,70,58,0.3)" : RED,
                   borderRadius: "20px 20px 4px 20px",
                   padding: "24px 32px", maxWidth: "70%",
                   fontSize: 32, lineHeight: "42px", color: WHITE,
+                  border: msg.rejected ? `3px dashed ${RED}` : "none",
                 }}>
                   {msg.content}
                 </div>
