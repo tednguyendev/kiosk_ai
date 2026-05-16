@@ -9,7 +9,6 @@ window.__CONFIG = {
   LIVEAVATAR_API_KEY: '860a7348-9cfa-4fcf-9f33-4b6f4a6c2721',
   LIVEAVATAR_AVATAR_ID: '1e614fa7-6eeb-4c81-a418-2865ce420dd1',
   LIVEAVATAR_VOICE_ID: 'de5574fc-009e-4a01-a881-9919ef8f5a0c', // Ann - IA
-  LIVEAVATAR_CONTEXT_ID: 'e047f19d-9f27-49e4-b4e6-f8bb28c0ef94',
   GEMINI_API_KEY: '',
   GEMINI_MODEL: 'gemini-2.5-flash',
   OPENAI_API_KEY: ''
@@ -18,12 +17,8 @@ window.__CONFIG = {
 <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-<!-- LiveAvatar SDK -->
-<script type="module">
-  import * as sdk from 'https://esm.sh/@heygen/liveavatar-web-sdk';
-  window.LiveAvatarSDK = sdk;
-  window.dispatchEvent(new Event('liveavatar-sdk-ready'));
-</script>
+<!-- LiveKit SDK for WebRTC -->
+<script src="https://cdn.jsdelivr.net/npm/livekit-client@2.6.2/dist/livekit-client.umd.min.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -496,14 +491,9 @@ async function callGemini(conversationHistory) {
     .trim();
 }
 
-// ─── LiveAvatar SDK Helpers ───
+// ─── LiveAvatar Integration ───
 
-const SDK_READY = new Promise(resolve => {
-  if (window.LiveAvatarSDK) { resolve(); return; }
-  window.addEventListener('liveavatar-sdk-ready', resolve, { once: true });
-});
-
-async function createLiveAvatarSessionToken(avatarId, voiceId, contextId) {
+async function createLiveAvatarSession(avatarId) {
   const API_KEY = window.__CONFIG.LIVEAVATAR_API_KEY;
   const res = await fetch('https://api.liveavatar.com/v1/sessions/token', {
     method: 'POST',
@@ -517,19 +507,260 @@ async function createLiveAvatarSessionToken(avatarId, voiceId, contextId) {
       is_sandbox: false,
       video_settings: { quality: 'high', encoding: 'H264' },
       avatar_persona: {
-        voice_id: voiceId,
+        voice_id: window.__CONFIG.LIVEAVATAR_VOICE_ID,
         first_message: "Hello! I'm Kimberly, your AI concierge here at Kopitiam, Tan Tock Seng Hospital. We have 21 food stalls with local favourites, halal options, and more. What are you in the mood for?",
-        system_prompt: `You are Kimberly, AI concierge at Kopitiam in Tan Tock Seng Hospital. There are 21 food stalls.\nIMPORTANT: Always recommend exactly ONE stall and ONE dish. Never suggest multiple stalls.\nWhen recommending, always mention the stall number.\nALWAYS make a recommendation — never just ask clarifying questions.\nBe friendly, warm, and conversational. Respond in 4-6 sentences.\n\nHere is the stall directory:\nStall 1: Kaffe Toast (Western) - Toast bread sets with eggs and kaya\nStall 2: Toast Box (Western) - Thick toast with various toppings\nStall 3: Yaohan Kaya Toast (Singaporean) - Traditional kaya toast\nStall 4: Takahashi (Japanese) - Volcano chicken, stone bowls\nStall 5: Thoh @ The Pan (Indian) [Halal] - Prata, thosai, murtabak\nStall 6: Suntown Cafe (Western) - Chicken chop, steak, pasta\nStall 7: Wang Dae Bak (Korean) - BBQ pork, kimchi soup, army stew\nStall 8: Zhou's Kitchen (Chinese) - Porridge, Cantonese-style\nStall 9: Affordable Nasi Lemak (Malay) - Nasi lemak with sides\nStall 10: ILA [India] (Indian) [Halal] - Prata, briyani, Indian snacks\nStall 11: Malay Street (Malay) [Halal] - Nasi lemak, mee rebus\nStall 12: Hong Luo Chinese Pastry (Chinese) - Handmade buns, pau\nStall 13: Nature's Vitamin (Beverages) - Fresh juices, smoothies\nStall 14: Santiago (Western) [Halal] - Chicken rice, roasted meat\nStall 15: Monster Chili Mala Hot Pot (Chinese) [Halal] - Mala hotpot, customizable spice\nStall 16: Chef-on! (Western) [Halal] - Pasta, grill, zi char\nStall 17: Penang Kitchen (Peranakan) - Laksa, char kway teow\nStall 18: Superfish (Chinese) - Fish soup, sliced fish\nStall 19: Coastal Rhythm (Indonesian) [Halal] - Beef rendang, ayam penyet\nStall 20: Tsuru-Hashi (Japanese) - Donburi, udon, salmon\nStall 21: Qing Zun Ge (Chinese) - Herbal soup, vegetarian options`,
-        context_id: contextId
+        system_prompt: `You are Kimberly, AI concierge at Kopitiam in Tan Tock Seng Hospital. There are 21 food stalls.
+IMPORTANT: Always recommend exactly ONE stall and ONE dish. Never suggest multiple stalls.
+When recommending, always mention the stall number.
+ALWAYS make a recommendation — never just ask clarifying questions.
+Be friendly, warm, and conversational. Respond in 4-6 sentences.
+
+Here is the stall directory:
+Stall 1: Kaffe Toast (Western) - Toast bread sets with eggs and kaya
+Stall 2: Toast Box (Western) - Thick toast with various toppings
+Stall 3: Yaohan Kaya Toast (Singaporean) - Traditional kaya toast
+Stall 4: Takahashi (Japanese) - Volcano chicken, stone bowls
+Stall 5: Thoh @ The Pan (Indian) [Halal] - Prata, thosai, murtabak
+Stall 6: Suntown Cafe (Western) - Chicken chop, steak, pasta
+Stall 7: Wang Dae Bak (Korean) - BBQ pork, kimchi soup, army stew
+Stall 8: Zhou's Kitchen (Chinese) - Porridge, Cantonese-style
+Stall 9: Affordable Nasi Lemak (Malay) - Nasi lemak with sides
+Stall 10: ILA [India] (Indian) [Halal] - Prata, briyani, Indian snacks
+Stall 11: Malay Street (Malay) [Halal] - Nasi lemak, mee rebus
+Stall 12: Hong Luo Chinese Pastry (Chinese) - Handmade buns, pau
+Stall 13: Nature's Vitamin (Beverages) - Fresh juices, smoothies
+Stall 14: Santiago (Western) [Halal] - Chicken rice, roasted meat
+Stall 15: Monster Chili Mala Hot Pot (Chinese) [Halal] - Mala hotpot, customizable spice
+Stall 16: Chef-on! (Western) [Halal] - Pasta, grill, zi char
+Stall 17: Penang Kitchen (Peranakan) - Laksa, char kway teow
+Stall 18: Superfish (Chinese) - Fish soup, sliced fish
+Stall 19: Coastal Rhythm (Indonesian) [Halal] - Beef rendang, ayam penyet
+Stall 20: Tsuru-Hashi (Japanese) - Donburi, udon, salmon
+Stall 21: Qing Zun Ge (Chinese) - Herbal soup, vegetarian options`
       }
     })
   });
+
   if (!res.ok) {
     const err = await res.text();
     throw new Error(`LiveAvatar session error: ${res.status} - ${err}`);
   }
+
   const data = await res.json();
-  return data.data.session_token;
+  return {
+    sessionId: data.data.session_id,
+    sessionToken: data.data.session_token
+  };
+}
+
+async function startLiveAvatarSession(sessionId, sessionToken) {
+  const API_KEY = window.__CONFIG.LIVEAVATAR_API_KEY;
+  const res = await fetch('https://api.liveavatar.com/v1/sessions/start', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-API-KEY': API_KEY,
+      'Authorization': `Bearer ${sessionToken}`
+    },
+    body: JSON.stringify({
+      session_id: sessionId,
+      sdp_offer: ''
+    })
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`LiveAvatar start error: ${res.status} - ${err}`);
+  }
+
+  const data = await res.json();
+  return {
+    livekitUrl: data.data.livekit_url,
+    livekitToken: data.data.livekit_client_token,
+    maxDuration: data.data.max_session_duration
+  };
+}
+
+// Connect to LiveKit room
+async function connectToLiveKit(livekitUrl, livekitToken, sessionId, onTrack, onDataMessage, onSpeak) {
+  const room = new LivekitClient.Room();
+
+  // Connect to LiveKit
+  await room.connect(livekitUrl, livekitToken);
+
+  console.log('[LiveAvatar] Connected to LiveKit, participants:', room.remoteParticipants.size);
+
+  // Note: We don't publish a separate mic track here.
+  // Our VAD system already captures mic audio for Whisper STT.
+  // We send AI responses to LiveAvatar via data channel (avatar.speak_response)
+  // so the avatar generates lip-synced speech. This avoids double mic streams
+  // that can cause silence detection issues in LiveKit.
+  console.log('[LiveAvatar] Mic handled by VAD; responses sent via data channel');
+
+  // Expose the speak function (not used in FULL mode but available for custom input)
+  onSpeak({
+    speak: async (text) => {
+      // In FULL mode, LiveAvatar handles everything automatically
+      // This function is available for custom text input if needed
+      console.log('[LiveAvatar] Custom text (not sent in FULL mode):', text.slice(0, 50));
+      return true;
+    }
+  });
+
+  // Listen for track subscriptions (audio/video from avatar)
+  room.on('trackSubscribed', (track, publication, participant) => {
+    console.log('[LiveAvatar] Track subscribed:', track.kind);
+    onTrack(track);
+  });
+
+  // Listen for data messages (response events from LiveAvatar)
+  room.on('dataReceived', (payload, participant, kind, topic) => {
+    const text = new TextDecoder().decode(payload);
+    console.log('[LiveAvatar] ========== Data received ==========');
+    console.log('[LiveAvatar] topic:', topic);
+    console.log('[LiveAvatar] kind:', kind);
+    console.log('[LiveAvatar] participant:', participant?.identity);
+    console.log('[LiveAvatar] text:', text.slice(0, 500));
+    console.log('[LiveAvatar] =====================================');
+
+    try {
+      const event = JSON.parse(text);
+      console.log('[LiveAvatar] Parsed event type:', event.event_type);
+      console.log('[LiveAvatar] Full event:', JSON.stringify(event, null, 2));
+
+      // Handle response events
+      if (event.event_type === 'avatar.speak_started') {
+        onDataMessage({ type: 'speaking_start' });
+      } else if (event.event_type === 'avatar.speak_ended') {
+        onDataMessage({ type: 'speaking_end' });
+      } else if (event.event_type === 'avatar.transcription') {
+        // User speech transcription from LiveAvatar
+        onDataMessage({ type: 'user_transcription', text: event.text });
+      } else if (event.event_type === 'avatar.response') {
+        // Avatar's LLM response
+        onDataMessage({ type: 'avatar_response', text: event.text });
+      }
+    } catch (e) {
+      console.log('[LiveAvatar] Non-JSON data:', text.slice(0, 100));
+    }
+  });
+
+  // Handle existing tracks (avatar might already be in room)
+  room.remoteParticipants.forEach((participant) => {
+    console.log('[LiveAvatar] Participant:', participant.identity);
+    participant.trackPublications.forEach((pub) => {
+      if (pub.track && (pub.kind === 'video' || pub.kind === 'audio')) {
+        onTrack(pub.track);
+      }
+    });
+  });
+
+  return { room };
+}
+
+// Send text to LiveAvatar via data channel event
+async function sendTextToLiveAvatar(room, sessionId, text) {
+  if (!room || !room.localParticipant) {
+    console.error('[LiveAvatar] No room');
+    return false;
+  }
+
+  try {
+    // Try avatar.speak_response first (for conversational responses in FULL mode)
+    const event = {
+      event_id: crypto.randomUUID(),
+      event_type: 'avatar.speak_response',
+      session_id: sessionId,
+      source_event_id: null,
+      text: text
+    };
+
+    const payload = new TextEncoder().encode(JSON.stringify(event));
+    try {
+      room.localParticipant.publishData(payload, 0, 'agent-control');
+      console.log('[LiveAvatar] Sent avatar.speak_response via agent-control:', text.slice(0, 50));
+    } catch (e) {
+      room.localParticipant.publishData(payload, 0);
+      console.log('[LiveAvatar] Sent avatar.speak_response (no topic):', text.slice(0, 50));
+    }
+
+    // Also try avatar.speak_text as fallback
+    setTimeout(() => {
+      const event2 = {
+        event_id: crypto.randomUUID(),
+        event_type: 'avatar.speak_text',
+        session_id: sessionId,
+        source_event_id: null,
+        text: text
+      };
+      const payload2 = new TextEncoder().encode(JSON.stringify(event2));
+      try {
+        room.localParticipant.publishData(payload2, 0, 'agent-control');
+        console.log('[LiveAvatar] Sent avatar.speak_text fallback via agent-control');
+      } catch (e2) {
+        try { room.localParticipant.publishData(payload2, 0); } catch (e3) {}
+      }
+    }, 200);
+
+    return true;
+  } catch (err) {
+    console.error('[LiveAvatar] Send error:', err);
+    return false;
+  }
+}
+
+// Detect speaking from video activity (fallback if data messages don't work)
+function setupVideoSpeakingDetection(videoElement, onSpeakingStart, onSpeakingEnd) {
+  if (!videoElement) return;
+
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  let lastFrameData = null;
+  let speakingTimeout = null;
+  let frameCount = 0;
+
+  const checkInterval = setInterval(() => {
+    if (videoElement.paused || videoElement.ended) return;
+
+    canvas.width = 160;
+    canvas.height = 120;
+    ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+    const frameData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+
+    if (lastFrameData) {
+      let diff = 0;
+      for (let i = 0; i < frameData.length; i += 4) {
+        diff += Math.abs(frameData[i] - lastFrameData[i]) +
+                Math.abs(frameData[i+1] - lastFrameData[i+1]) +
+                Math.abs(frameData[i+2] - lastFrameData[i+2]);
+      }
+      const avgDiff = diff / (canvas.width * canvas.height * 3);
+
+      // Avatar is speaking if there's significant pixel change
+      const isSpeaking = avgDiff > 5;
+
+      if (isSpeaking && !speakingTimeout) {
+        if (onSpeakingStart) onSpeakingStart();
+      } else if (!isSpeaking && speakingTimeout) {
+        clearTimeout(speakingTimeout);
+        speakingTimeout = null;
+        if (onSpeakingEnd) onSpeakingEnd();
+      }
+
+      if (isSpeaking) {
+        if (speakingTimeout) clearTimeout(speakingTimeout);
+        speakingTimeout = setTimeout(() => {
+          speakingTimeout = null;
+          if (onSpeakingEnd) onSpeakingEnd();
+        }, 500);
+      }
+    }
+
+    lastFrameData = frameData;
+    frameCount++;
+  }, 100);
+
+  return () => clearInterval(checkInterval);
 }
 
 // ─── App ───
@@ -542,14 +773,15 @@ function App() {
   const [avatarConnected, setAvatarConnected] = useState(false);
   const [videoReady, setVideoReady] = useState(false);
   const [avatarStatus, setAvatarStatus] = useState("Initializing...");
-  const [sdkUserSpeaking, setSdkUserSpeaking] = useState(false);
   const videoRef = useRef(null);
-  const liveAvatarSessionRef = useRef(null);
+  const livekitRoomRef = useRef(null);
   const chatEndRef = useRef(null);
-  const userSpokeFirstRef = useRef(false);
-  const avatarTranscriptRef = useRef('');
-  const avatarTranscriptFinal = useRef(false);
-  const lastAssistantText = useRef('');
+  const speakRef = useRef(null);
+  const avatarConnectedRef = useRef(false);
+  const avatarSpeakingRef = useRef(false);
+  const avatarVideoTrackRef = useRef(null);
+  const avatarAudioTrackRef = useRef(null);
+  const liveAvatarSessionIdRef = useRef(null);
   const sendToAgentRef = useRef(null);
   const messagesRef = useRef(messages);
   useEffect(() => { messagesRef.current = messages; }, [messages]);
@@ -564,7 +796,9 @@ function App() {
       setMessages(prev => [...prev, { role: 'assistant', content: reply }]);
 
       // Try to make LiveAvatar speak the response via data channel
-      // SDK FULL mode handles responses automatically
+      if (livekitRoomRef.current && liveAvatarSessionIdRef.current) {
+        await sendTextToLiveAvatar(livekitRoomRef.current, liveAvatarSessionIdRef.current, reply);
+      }
 
       // Note: We rely on LiveAvatar to speak the response via data channel.
       // Browser TTS is disabled so the avatar uses its own voice.
@@ -582,14 +816,20 @@ function App() {
   const vadStreamRef = useRef(null);
 
   const { isListening, isSpeaking: userSpeaking, isTranscribing, supported } = useVoiceActivity({
-    enabled: false, // SDK FULL mode handles mic/voice automatically
+    enabled: started && avatarConnected,
     paused: speaking || loading,
     onUtterance: (text) => sendToAgentRef.current && sendToAgentRef.current(text),
     onRejected: (reason) => console.log('[VAD] rejected:', reason),
     onStreamReady: (stream) => {
       vadStreamRef.current = stream;
       console.log('[VAD] Mic stream ready');
-      // SDK handles its own mic via voiceChat.start(); don't publish VAD stream
+      // Publish to LiveKit if room already connected
+      if (livekitRoomRef.current && livekitRoomRef.current.localParticipant) {
+        const audioTrack = stream.getAudioTracks()[0];
+        livekitRoomRef.current.localParticipant.publishTrack(audioTrack, { name: 'microphone' })
+          .then(() => console.log('[LiveAvatar] Published VAD mic to LiveKit'))
+          .catch(err => console.error('[LiveAvatar] Failed to publish VAD mic:', err));
+      }
     },
   });
 
@@ -611,147 +851,119 @@ function App() {
   useEffect(() => {
     if (!started) return;
     let cancelled = false;
-    let session = null;
 
     async function connectLiveAvatar() {
       try {
         setAvatarStatus("Creating session...");
         console.log('[LiveAvatar] Creating session for avatar:', LIVEAVATAR_AVATAR_ID);
 
-        await SDK_READY;
-        const { LiveAvatarSession } = window.LiveAvatarSDK;
-
-        const sessionToken = await createLiveAvatarSessionToken(
-          LIVEAVATAR_AVATAR_ID,
-          LIVEAVATAR_VOICE_ID,
-          window.__CONFIG.LIVEAVATAR_CONTEXT_ID
+        const { sessionId, sessionToken } = await createLiveAvatarSession(
+          LIVEAVATAR_AVATAR_ID
         );
 
         if (cancelled) return;
 
-        session = new LiveAvatarSession(sessionToken, { voiceChat: true });
-        liveAvatarSessionRef.current = session;
-        console.log('[LiveAvatar] Session created');
-        setAvatarStatus("Starting stream...");
+        liveAvatarSessionIdRef.current = sessionId;
+        console.log('[LiveAvatar] Session created:', sessionId);
+        setAvatarStatus("Connecting to avatar...");
 
-        // Set up event listeners
-        const { AgentEventsEnum, SessionEvent } = window.LiveAvatarSDK;
+        const { livekitUrl, livekitToken } = await startLiveAvatarSession(sessionId, sessionToken);
 
-        session.on(SessionEvent.SESSION_STREAM_READY, () => {
-          console.log('[LiveAvatar] Stream ready');
-          if (videoRef.current) {
-            session.attach(videoRef.current);
-            videoRef.current.play().then(() => {
-              setTimeout(() => { if (videoRef.current) videoRef.current.muted = false; }, 50);
-            }).catch(e => console.log('[LiveAvatar] Play error:', e));
+        if (cancelled) return;
+
+        console.log('[LiveAvatar] Starting LiveKit connection...');
+
+        const { room } = await connectToLiveKit(
+          livekitUrl,
+          livekitToken,
+          sessionId,
+          (track) => {
+            console.log('[LiveAvatar] Track received:', track.kind);
+            // Store the tracks
+            if (track.kind === 'video') {
+              avatarVideoTrackRef.current = track.mediaStreamTrack;
+            } else if (track.kind === 'audio') {
+              avatarAudioTrackRef.current = track.mediaStreamTrack;
+            }
+
+            // When we have both tracks (or at least one), update the MediaStream
+            if (videoRef.current && (avatarVideoTrackRef.current || avatarAudioTrackRef.current)) {
+              const tracks = [];
+              if (avatarVideoTrackRef.current) tracks.push(avatarVideoTrackRef.current);
+              if (avatarAudioTrackRef.current) tracks.push(avatarAudioTrackRef.current);
+
+              videoRef.current.srcObject = new MediaStream(tracks);
+              videoRef.current.onloadedmetadata = () => {
+                videoRef.current.play().catch((e) => console.log('[LiveAvatar] Play error:', e));
+                // Set up video-based speaking detection as fallback
+                if (avatarVideoTrackRef.current && !avatarVideoTrackRef.current._speakingDetectionSetup) {
+                  avatarVideoTrackRef.current._speakingDetectionSetup = true;
+                  setupVideoSpeakingDetection(
+                    videoRef.current,
+                    () => {
+                      if (!avatarSpeakingRef.current) {
+                        setSpeaking(true);
+                        avatarSpeakingRef.current = true;
+                      }
+                    },
+                    () => {
+                      if (avatarSpeakingRef.current) {
+                        setSpeaking(false);
+                        avatarSpeakingRef.current = false;
+                      }
+                    }
+                  );
+                }
+              };
+              videoRef.current.play().then(() => {
+                setTimeout(() => {
+                  if (videoRef.current) {
+                    videoRef.current.muted = false;
+                    console.log('[LiveAvatar] Track handler: unmuted video');
+                  }
+                }, 50);
+              }).catch((e) => console.log('[LiveAvatar] Track handler play error:', e));
+            }
+
+            setVideoReady(true);
+            setAvatarStatus("Connected! Speak to Kimberly...");
+            setAvatarConnected(true);
+            avatarConnectedRef.current = true;
+          },
+          (data) => {
+            // Handle data messages from LiveAvatar
+            console.log('[LiveAvatar] Data message:', data);
+
+            if (data.type === 'speaking_start') {
+              setSpeaking(true);
+              setLoading(false);
+            } else if (data.type === 'speaking_end') {
+              setSpeaking(false);
+            } else if (data.type === 'user_transcription') {
+              // User speech transcription from LiveAvatar
+              console.log('[LiveAvatar] User said:', data.text);
+              setMessages(prev => [...prev, { role: 'user', content: data.text }]);
+            } else if (data.type === 'avatar_response') {
+              // Avatar's LLM response
+              console.log('[LiveAvatar] Avatar response:', data.text);
+              setMessages(prev => [...prev, { role: 'assistant', content: data.text }]);
+            }
+          },
+          (speakApi) => {
+            // Store the speak function for later use (not needed in FULL mode but available)
+            speakRef.current = speakApi.speak;
+            // In FULL mode, first_message triggers automatically
           }
-          setVideoReady(true);
-          setAvatarStatus("Connected! Speak to Kimberly...");
-          setAvatarConnected(true);
-        });
-
-        session.on(AgentEventsEnum.AVATAR_SPEAK_STARTED, () => {
-          console.log('[LiveAvatar] Avatar speak started');
-          setSpeaking(true);
-          setLoading(false);
-          avatarTranscriptRef.current = '';
-          avatarTranscriptFinal.current = false;
-          // Safety: auto-reset speaking after 30s if speak_ended never fires
-          if (window._speakTimeout) clearTimeout(window._speakTimeout);
-          window._speakTimeout = setTimeout(() => {
-            console.log('[LiveAvatar] Safety: auto-reset speaking');
-            setSpeaking(false);
-            avatarTranscriptRef.current = '';
-            avatarTranscriptFinal.current = false;
-          }, 30000);
-        });
-
-        session.on(AgentEventsEnum.AVATAR_TRANSCRIPTION_CHUNK, (e) => {
-          if (!e.text || avatarTranscriptFinal.current) return;
-          avatarTranscriptRef.current += e.text;
-          setMessages(prev => {
-            const last = prev[prev.length - 1];
-            // Update existing assistant message, or create new one
-            if (last && last.role === 'assistant' && !last._final) {
-              const updated = [...prev];
-              updated[updated.length - 1] = { ...last, content: avatarTranscriptRef.current };
-              return updated;
-            }
-            return [...prev, { role: 'assistant', content: avatarTranscriptRef.current, _final: false }];
-          });
-        });
-
-        session.on(AgentEventsEnum.AVATAR_TRANSCRIPTION, (e) => {
-          console.log('[LiveAvatar] Avatar full text:', e.text);
-          if (!e.text) return;
-          // Deduplicate: skip if exact same text was already shown
-          if (e.text === lastAssistantText.current) {
-            console.log('[LiveAvatar] Duplicate transcription skipped');
-            return;
-          }
-          lastAssistantText.current = e.text;
-          avatarTranscriptRef.current = e.text;
-          avatarTranscriptFinal.current = true;
-          setMessages(prev => {
-            const last = prev[prev.length - 1];
-            if (last && last.role === 'assistant') {
-              const updated = [...prev];
-              updated[updated.length - 1] = { role: 'assistant', content: e.text, _final: true };
-              return updated;
-            }
-            return [...prev, { role: 'assistant', content: e.text, _final: true }];
-          });
-        });
-
-        session.on(AgentEventsEnum.AVATAR_SPEAK_ENDED, () => {
-          console.log('[LiveAvatar] Avatar speak ended');
-          if (window._speakTimeout) clearTimeout(window._speakTimeout);
-          setSpeaking(false);
-          avatarTranscriptRef.current = '';
-          avatarTranscriptFinal.current = false;
-          // Mark last assistant message as final so next chunk starts a new one
-          setMessages(prev => {
-            const last = prev[prev.length - 1];
-            if (last && last.role === 'assistant' && last._final !== true) {
-              const updated = [...prev];
-              updated[updated.length - 1] = { ...last, _final: true };
-              return updated;
-            }
-            return prev;
-          });
-        });
-
-        session.on(AgentEventsEnum.USER_TRANSCRIPTION, (e) => {
-          console.log('[LiveAvatar] User said:', e.text);
-          setMessages(prev => {
-            const last = prev[prev.length - 1];
-            if (last && last.role === 'user') {
-              return [...prev.slice(0, -1), { role: 'user', content: e.text }];
-            }
-            return [...prev, { role: 'user', content: e.text }];
-          });
-        });
-
-        session.on(AgentEventsEnum.USER_SPEAK_STARTED, () => {
-          console.log('[LiveAvatar] User speak started');
-          setSdkUserSpeaking(true);
-        });
-
-        session.on(AgentEventsEnum.USER_SPEAK_ENDED, () => {
-          console.log('[LiveAvatar] User speak ended');
-          setSdkUserSpeaking(false);
-        });
-
-        // Start the stream
-        await session.start();
+        );
 
         if (cancelled) {
-          session.stop();
+          room.disconnect();
           return;
         }
 
-        console.log('[LiveAvatar] Stream started (voice chat auto-started by SDK)');
+        livekitRoomRef.current = room;
 
+        console.log('[LiveAvatar] Connected successfully');
       } catch (err) {
         console.error("LiveAvatar connect error:", err);
         setAvatarStatus("Error: " + err.message);
@@ -763,8 +975,8 @@ function App() {
     // Cleanup on unmount
     return () => {
       cancelled = true;
-      if (session) {
-        try { session.stop(); } catch (e) {}
+      if (livekitRoomRef.current) {
+        try { livekitRoomRef.current.disconnect(); } catch (e) {}
       }
     };
   }, [started]);
@@ -973,7 +1185,7 @@ function App() {
           }}>
             {speaking ? "Kimberly is speaking…"
               : loading ? "Thinking…"
-              : sdkUserSpeaking ? "Hearing you…"
+              : userSpeaking ? "Hearing you…"
               : avatarConnected ? "Just speak — I'm listening"
               : "Connecting…"}
           </span>

@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>LiveAvatar Meet Test</title></head>
+<body style="font-family:sans-serif;padding:40px">
+<h2>LiveAvatar Official Test — Fresh Token Every Time</h2>
+<p>LiveKit tokens expire in ~5 minutes. This page creates a brand new token when you click.</p>
+<button id="go" style="font-size:24px;padding:20px 40px">Generate Fresh Token & Open Meet</button>
+<div id="status"></div>
+
+<script>
+const API_KEY = '860a7348-9cfa-4fcf-9f33-4b6f4a6c2721';
+const AVATAR_ID = '1e614fa7-6eeb-4c81-a418-2865ce420dd1';
+const VOICE_ID = 'de5574fc-009e-4a01-a881-9919ef8f5a0c';
+
+document.getElementById('go').onclick = async () => {
+  const status = document.getElementById('status');
+  status.textContent = 'Creating session token...';
+  
+  const tokenRes = await fetch('https://api.liveavatar.com/v1/sessions/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-API-KEY': API_KEY },
+    body: JSON.stringify({
+      avatar_id: AVATAR_ID,
+      mode: 'FULL',
+      avatar_persona: {
+        voice_id: VOICE_ID,
+        first_message: "Hello! I'm Kimberly.",
+        system_prompt: "You are a helpful assistant. Keep responses short.",
+        language: "en"
+      }
+    })
+  });
+  const tokenData = await tokenRes.json();
+  const sessionToken = tokenData.data.session_token;
+  const sessionId = tokenData.data.session_id;
+  
+  status.textContent = 'Starting session...';
+  const startRes = await fetch('https://api.liveavatar.com/v1/sessions/start', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` },
+    body: JSON.stringify({ session_id: sessionId, sdp_offer: '' })
+  });
+  const startData = await startRes.json();
+  const livekitUrl = startData.data.livekit_url;
+  const livekitToken = startData.data.livekit_client_token;
+  
+  const meetUrl = `https://meet.livekit.io/custom?liveKitUrl=${encodeURIComponent(livekitUrl)}&token=${encodeURIComponent(livekitToken)}`;
+  status.innerHTML = `<a href="${meetUrl}" target="_blank" style="font-size:20px">CLICK HERE TO OPEN MEET</a><br><br>Or copy this URL:<br><textarea style="width:100%;height:80px">${meetUrl}</textarea>`;
+  window.open(meetUrl, '_blank');
+};
+</script>
+</body>
+</html>

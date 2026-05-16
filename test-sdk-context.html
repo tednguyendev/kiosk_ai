@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>LiveAvatar SDK + Context Test</title></head>
+<body style="font-family:sans-serif;padding:40px">
+<h2>LiveAvatar SDK + Context Test</h2>
+<p>Using context_id: e047f19d-9f27-49e4-b4e6-f8bb28c0ef94</p>
+<button id="go" style="font-size:24px;padding:20px 40px">Start</button>
+<video id="video" autoplay playsinline muted style="width:400px;height:400px;border-radius:50%"></video>
+<div id="status">Idle</div>
+<div id="chat" style="font-family:monospace;white-space:pre-wrap"></div>
+
+<script type="module">
+const API_KEY = '860a7348-9cfa-4fcf-9f33-4b6f4a6c2721';
+const AVATAR_ID = '1e614fa7-6eeb-4c81-a418-2865ce420dd1';
+const VOICE_ID = 'de5574fc-009e-4a01-a881-9919ef8f5a0c';
+const CONTEXT_ID = 'e047f19d-9f27-49e4-b4e6-f8bb28c0ef94';
+
+const status = document.getElementById('status');
+const chat = document.getElementById('chat');
+const video = document.getElementById('video');
+
+function log(msg) {
+  console.log(msg);
+  chat.textContent += msg + '\n';
+}
+
+document.getElementById('go').onclick = async () => {
+  try {
+    status.textContent = 'Loading SDK...';
+    const { LiveAvatarSession, AgentEventsEnum, SessionEvent, VoiceChatEvent } = await import('https://esm.sh/@heygen/liveavatar-web-sdk');
+    
+    status.textContent = 'Creating session token...';
+    const tokenRes = await fetch('https://api.liveavatar.com/v1/sessions/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-API-KEY': API_KEY },
+      body: JSON.stringify({
+        avatar_id: AVATAR_ID,
+        mode: 'FULL',
+        avatar_persona: {
+          voice_id: VOICE_ID,
+          context_id: CONTEXT_ID,
+          language: "en"
+        }
+      })
+    });
+    const tokenData = await tokenRes.json();
+    log('Token: ' + JSON.stringify(tokenData.data, null, 2));
+    const sessionToken = tokenData.data.session_token;
+    
+    status.textContent = 'Starting session...';
+    const session = new LiveAvatarSession(sessionToken, {
+      voiceChat: true,
+      apiUrl: 'https://api.liveavatar.com'
+    });
+
+    Object.values(AgentEventsEnum).forEach(eventName => {
+      session.on(eventName, (data) => {
+        log(`[EVENT] ${eventName}: ${JSON.stringify(data).slice(0, 200)}`);
+      });
+    });
+
+    session.on(SessionEvent.SESSION_STATE_CHANGED, (state) => {
+      log(`[STATE] ${state}`);
+      status.textContent = 'State: ' + state;
+    });
+
+    session.on(SessionEvent.SESSION_STREAM_READY, () => {
+      log('[STREAM READY]');
+    });
+
+    session.voiceChat.on(VoiceChatEvent.STATE_CHANGED, (state) => {
+      log(`[VOICE STATE] ${state}`);
+    });
+
+    await session.start();
+    session.attach(video);
+    
+    status.textContent = 'Starting voice chat...';
+    await session.voiceChat.start();
+    
+    status.textContent = 'Connected! Speak now...';
+    log('=== Ready ===');
+
+  } catch (err) {
+    status.textContent = 'Error: ' + err.message;
+    log('ERROR: ' + err.message);
+    console.error(err);
+  }
+};
+</script>
+</body>
+</html>
