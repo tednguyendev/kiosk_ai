@@ -548,8 +548,8 @@ function App() {
   const chatEndRef = useRef(null);
   const userSpokeFirstRef = useRef(false);
   const avatarTranscriptRef = useRef('');
-  const avatarTranscriptFinal = useRef(false);
   const lastAssistantText = useRef('');
+  const dialogStateRef = useRef('idle'); // 'idle' | 'avatar_speaking' | 'avatar_paused' | 'user_speaking'
   const sendToAgentRef = useRef(null);
   const messagesRef = useRef(messages);
   useEffect(() => { messagesRef.current = messages; }, [messages]);
@@ -654,30 +654,30 @@ function App() {
           console.log('[LiveAvatar] Avatar speak started');
           setSpeaking(true);
           setLoading(false);
+          dialogStateRef.current = 'avatar_speaking';
           avatarTranscriptRef.current = '';
-          avatarTranscriptFinal.current = false;
           // Safety: auto-reset speaking after 30s if speak_ended never fires
           if (window._speakTimeout) clearTimeout(window._speakTimeout);
           window._speakTimeout = setTimeout(() => {
             console.log('[LiveAvatar] Safety: auto-reset speaking');
             setSpeaking(false);
+            dialogStateRef.current = 'idle';
             avatarTranscriptRef.current = '';
-            avatarTranscriptFinal.current = false;
           }, 30000);
         });
 
         session.on(AgentEventsEnum.AVATAR_TRANSCRIPTION_CHUNK, (e) => {
-          if (!e.text || avatarTranscriptFinal.current) return;
+          if (!e.text) return;
           avatarTranscriptRef.current += e.text;
+          const canUpdateLast = dialogStateRef.current === 'avatar_speaking' || dialogStateRef.current === 'avatar_paused';
           setMessages(prev => {
             const last = prev[prev.length - 1];
-            // Update existing assistant message, or create new one
-            if (last && last.role === 'assistant' && !last._final) {
+            if (last && last.role === 'assistant' && canUpdateLast) {
               const updated = [...prev];
               updated[updated.length - 1] = { ...last, content: avatarTranscriptRef.current };
               return updated;
             }
-            return [...prev, { role: 'assistant', content: avatarTranscriptRef.current, _final: false }];
+            return [...prev, { role: 'assistant', content: avatarTranscriptRef.current }];
           });
         });
 
@@ -691,15 +691,15 @@ function App() {
           }
           lastAssistantText.current = e.text;
           avatarTranscriptRef.current = e.text;
-          avatarTranscriptFinal.current = true;
+          const canUpdateLast = dialogStateRef.current === 'avatar_speaking' || dialogStateRef.current === 'avatar_paused';
           setMessages(prev => {
             const last = prev[prev.length - 1];
-            if (last && last.role === 'assistant') {
+            if (last && last.role === 'assistant' && canUpdateLast) {
               const updated = [...prev];
-              updated[updated.length - 1] = { role: 'assistant', content: e.text, _final: true };
+              updated[updated.length - 1] = { ...last, content: e.text };
               return updated;
             }
-            return [...prev, { role: 'assistant', content: e.text, _final: true }];
+            return [...prev, { role: 'assistant', content: e.text }];
           });
         });
 
@@ -707,18 +707,7 @@ function App() {
           console.log('[LiveAvatar] Avatar speak ended');
           if (window._speakTimeout) clearTimeout(window._speakTimeout);
           setSpeaking(false);
-          avatarTranscriptRef.current = '';
-          avatarTranscriptFinal.current = false;
-          // Mark last assistant message as final so next chunk starts a new one
-          setMessages(prev => {
-            const last = prev[prev.length - 1];
-            if (last && last.role === 'assistant' && last._final !== true) {
-              const updated = [...prev];
-              updated[updated.length - 1] = { ...last, _final: true };
-              return updated;
-            }
-            return prev;
-          });
+          dialogStateRef.current = 'avatar_paused';
         });
 
         session.on(AgentEventsEnum.USER_TRANSCRIPTION, (e) => {
@@ -735,11 +724,13 @@ function App() {
         session.on(AgentEventsEnum.USER_SPEAK_STARTED, () => {
           console.log('[LiveAvatar] User speak started');
           setSdkUserSpeaking(true);
+          dialogStateRef.current = 'user_speaking';
         });
 
         session.on(AgentEventsEnum.USER_SPEAK_ENDED, () => {
           console.log('[LiveAvatar] User speak ended');
           setSdkUserSpeaking(false);
+          dialogStateRef.current = 'idle';
         });
 
         // Start the stream
