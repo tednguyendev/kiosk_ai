@@ -769,6 +769,72 @@ function App() {
   const avatarVideoTrackRef = useRef(null);
   const avatarAudioTrackRef = useRef(null);
   const liveAvatarSessionIdRef = useRef(null);
+  const sendToAgentRef = useRef(null);
+  const messagesRef = useRef(messages);
+  useEffect(() => { messagesRef.current = messages; }, [messages]);
+
+  async function sendToAgent(text) {
+    if (!text.trim()) return;
+    setMessages(prev => [...prev, { role: 'user', content: text }]);
+    setLoading(true);
+    try {
+      const history = [...messagesRef.current, { role: 'user', content: text }];
+      const reply = await callGemini(history);
+      setMessages(prev => [...prev, { role: 'assistant', content: reply }]);
+
+      // Try to make LiveAvatar speak the response via data channel
+      if (livekitRoomRef.current && liveAvatarSessionIdRef.current) {
+        await sendTextToLiveAvatar(livekitRoomRef.current, liveAvatarSessionIdRef.current, reply);
+      }
+
+      // Fallback browser TTS
+      if (window.speechSynthesis) {
+        window.speechSynthesis.resume();
+        const utterance = new SpeechSynthesisUtterance(reply);
+        utterance.rate = 1.0;
+        utterance.pitch = 1.0;
+        // Pick a decent voice if available
+        let voices = window.speechSynthesis.getVoices();
+        if (!voices || voices.length === 0) {
+          // Voices may load asynchronously in some browsers
+          voices = await new Promise(resolve => {
+            const check = () => {
+              const v = window.speechSynthesis.getVoices();
+              if (v && v.length > 0) resolve(v);
+              else setTimeout(check, 100);
+            };
+            check();
+          });
+        }
+        const preferred = voices.find(v => v.lang.startsWith('en') && v.name.includes('Female'))
+                       || voices.find(v => v.lang.startsWith('en'))
+                       || voices[0];
+        if (preferred) utterance.voice = preferred;
+        console.log('[TTS] Speaking with voice:', preferred?.name || 'default', 'voices count:', voices.length);
+        window.speechSynthesis.speak(utterance);
+      }
+    } catch (err) {
+      console.error('Gemini error:', err);
+      setMessages(prev => [...prev, { role: 'assistant', content: "Sorry, I couldn't process that." }]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { sendToAgentRef.current = sendToAgent; });
+
+  const { isListening, isSpeaking: userSpeaking, isTranscribing, supported } = useVoiceActivity({
+    enabled: started && avatarConnected,
+    paused: speaking || loading,
+    onUtterance: (text) => sendToAgentRef.current && sendToAgentRef.current(text),
+    onRejected: (reason) => console.log('[VAD] rejected:', reason),
+  });
+
+  useEffect(() => {
+    if (!userSpeaking) return;
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
+    if (speaking) setSpeaking(false);
+  }, [userSpeaking, speaking]);
 
   const LIVEAVATAR_API_KEY = window.__CONFIG?.LIVEAVATAR_API_KEY;
   const LIVEAVATAR_AVATAR_ID = window.__CONFIG?.LIVEAVATAR_AVATAR_ID;
@@ -846,7 +912,14 @@ function App() {
                   );
                 }
               };
-              videoRef.current.play().catch(() => {});
+              videoRef.current.play().then(() => {
+                setTimeout(() => {
+                  if (videoRef.current) {
+                    videoRef.current.muted = false;
+                    console.log('[LiveAvatar] Track handler: unmuted video');
+                  }
+                }, 50);
+              }).catch((e) => console.log('[LiveAvatar] Track handler play error:', e));
             }
 
             setVideoReady(true);
@@ -974,8 +1047,21 @@ function App() {
         boxShadow: speaking ? `0 0 60px rgba(245,177,80,0.4)` : "0 8px 40px rgba(0,0,0,0.15)",
         transition: "all 0.3s",
       }}>
-        <video ref={videoRef} autoPlay playsInline
-          onLoadedMetadata={() => { if (videoRef.current) videoRef.current.play().catch(() => {}); }}
+        <video ref={videoRef} autoPlay playsInline muted
+          onLoadedMetadata={() => {
+            if (videoRef.current) {
+              videoRef.current.play().then(() => {
+                console.log('[LiveAvatar] Video playing');
+                // Try to unmute after play succeeds
+                setTimeout(() => {
+                  if (videoRef.current) {
+                    videoRef.current.muted = false;
+                    console.log('[LiveAvatar] Video unmuted');
+                  }
+                }, 50);
+              }).catch((e) => console.log('[LiveAvatar] Play error:', e));
+            }
+          }}
           style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center top" }}
         />
         {!videoReady && (
@@ -1096,6 +1182,7 @@ function App() {
           }}>
             {speaking ? "Kimberly is speaking…"
               : loading ? "Thinking…"
+              : userSpeaking ? "Hearing you…"
               : avatarConnected ? "Just speak — I'm listening"
               : "Connecting…"}
           </span>
