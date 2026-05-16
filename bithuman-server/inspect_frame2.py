@@ -1,11 +1,12 @@
 import asyncio
+import os
 import inspect
 from bithuman import AsyncBithuman
 
 async def main():
     runtime = await AsyncBithuman.create(
         model_path="avatar.imx",
-        api_secret="dOIQCNkA6HbqHDvh5JqzKIhr1Cku48P4SzLBlXicA39XED7vdUDFPBh3lMCbt37Gy"
+        api_secret=os.environ.get("BITHUMAN_API_SECRET", "")
     )
     await runtime.start()
 

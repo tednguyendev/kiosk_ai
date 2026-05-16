@@ -47,14 +47,32 @@ async def cors_middleware(request, handler):
     return resp
 
 
-# ─── Config ───
-API_SECRET = "W8OWvGKO9P0kdF8dU2YBcPHKIw5iegMGSP8FvvGHFVlvdZAT1MQvB2ICDGsRg2ZHE"
-MODEL_PATH = "avatar.imx"
-HOST = "0.0.0.0"
-PORT = 3001
+def _load_dotenv():
+    """Load .env file (if present) into os.environ."""
+    from pathlib import Path
+    env_path = Path(__file__).parent / ".env"
+    if env_path.exists():
+        for line in env_path.read_text().splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            os.environ.setdefault(key.strip(), value.strip().strip('"\''))
 
-OPENAI_API_KEY = "YOUR_OPENAI_API_KEY"
-OPENAI_VOICE = "nova"
+
+_load_dotenv()
+
+# ─── Config ───
+API_SECRET = os.environ.get("BITHUMAN_API_SECRET", "")
+MODEL_PATH = os.environ.get("BITHUMAN_MODEL_PATH", "avatar.imx")
+HOST = os.environ.get("BITHUMAN_HOST", "0.0.0.0")
+PORT = int(os.environ.get("BITHUMAN_PORT", "3001"))
+
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
+OPENAI_VOICE = os.environ.get("OPENAI_VOICE", "nova")
+
+if not OPENAI_API_KEY:
+    print("[WARN] OPENAI_API_KEY environment variable is not set. TTS will fail.")
 
 openai_client = AsyncOpenAI(api_key=OPENAI_API_KEY)
 

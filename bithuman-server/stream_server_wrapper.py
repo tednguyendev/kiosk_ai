@@ -7,9 +7,10 @@ This wrapper is kept for reference but is not needed for the full kiosk.
 """
 
 import asyncio
+import os
 from bithuman.stream_server import StreamServer
 
-API_SECRET = "dOIQCNkA6HbqHDvh5JqzKIhr1Cku48P4SzLBlXicA39XED7vdUDFPBh3lMCbt37Gy"
+API_SECRET = os.environ.get("BITHUMAN_API_SECRET", "")
 MODEL_PATH = "avatar.imx"
 
 async def main():

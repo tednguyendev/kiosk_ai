@@ -14,6 +14,7 @@ import asyncio
 import io
 import json
 import base64
+import os
 import numpy as np
 from PIL import Image
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -35,11 +36,29 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+def _load_dotenv():
+    """Load .env file (if present) into os.environ."""
+    from pathlib import Path
+    env_path = Path(__file__).parent / ".env"
+    if env_path.exists():
+        for line in env_path.read_text().splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            os.environ.setdefault(key.strip(), value.strip().strip('"\''))
+
+
+_load_dotenv()
+
 # ─── Config ───
-API_SECRET = "dOIQCNkA6HbqHDvh5JqzKIhr1Cku48P4SzLBlXicA39XED7vdUDFPBh3lMCbt37Gy"
-OPENAI_KEY = "YOUR_OPENAI_API_KEY"
-MODEL_PATH = "avatar.imx"
-SAMPLE_RATE = 24000  # OpenAI TTS sample rate
+API_SECRET = os.environ.get("BITHUMAN_API_SECRET", "")
+OPENAI_KEY = os.environ.get("OPENAI_API_KEY", "")
+MODEL_PATH = os.environ.get("BITHUMAN_MODEL_PATH", "avatar.imx")
+SAMPLE_RATE = int(os.environ.get("OPENAI_TTS_SAMPLE_RATE", "24000"))  # OpenAI TTS sample rate
+
+if not OPENAI_KEY:
+    print("[WARN] OPENAI_API_KEY environment variable is not set. TTS will fail.")
 
 # ─── Globals ───
 runtime = None
