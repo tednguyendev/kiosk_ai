@@ -669,15 +669,16 @@ function App() {
         session.on(AgentEventsEnum.AVATAR_TRANSCRIPTION_CHUNK, (e) => {
           if (!e.text) return;
           avatarTranscriptRef.current += e.text;
+          const currentText = avatarTranscriptRef.current;
           const canUpdateLast = dialogStateRef.current === 'avatar_speaking' || dialogStateRef.current === 'avatar_paused';
           setMessages(prev => {
             const last = prev[prev.length - 1];
             if (last && last.role === 'assistant' && canUpdateLast) {
               const updated = [...prev];
-              updated[updated.length - 1] = { ...last, content: avatarTranscriptRef.current };
+              updated[updated.length - 1] = { ...last, content: currentText };
               return updated;
             }
-            return [...prev, { role: 'assistant', content: avatarTranscriptRef.current }];
+            return [...prev, { role: 'assistant', content: currentText }];
           });
         });
 
@@ -691,15 +692,16 @@ function App() {
           }
           lastAssistantText.current = e.text;
           avatarTranscriptRef.current = e.text;
+          const currentText = e.text;
           const canUpdateLast = dialogStateRef.current === 'avatar_speaking' || dialogStateRef.current === 'avatar_paused';
           setMessages(prev => {
             const last = prev[prev.length - 1];
             if (last && last.role === 'assistant' && canUpdateLast) {
               const updated = [...prev];
-              updated[updated.length - 1] = { ...last, content: e.text };
+              updated[updated.length - 1] = { ...last, content: currentText };
               return updated;
             }
-            return [...prev, { role: 'assistant', content: e.text }];
+            return [...prev, { role: 'assistant', content: currentText }];
           });
         });
 
