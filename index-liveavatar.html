@@ -598,6 +598,10 @@ function App() {
   const [videoReady, setVideoReady] = useState(false);
   const [avatarStatus, setAvatarStatus] = useState("Initializing...");
   const [sdkUserSpeaking, setSdkUserSpeaking] = useState(false);
+  const [activeFilters, setActiveFilters] = useState({ halal: "all", language: "en" });
+  const activeFiltersRef = useRef({ halal: "all", language: "en" });
+  const [recommendations, setRecommendations] = useState([]);
+  const [filtered, setFiltered] = useState(false);
   const videoRef = useRef(null);
   const liveAvatarSessionRef = useRef(null);
   const chatEndRef = useRef(null);
