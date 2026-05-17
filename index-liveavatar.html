@@ -710,6 +710,18 @@ function App() {
           setVideoReady(true);
           setAvatarStatus("Connected! Speak to Kimberly...");
           setAvatarConnected(true);
+          // Pre-warm audio decoder with silent sound to reduce first-speech latency
+          try {
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const silentBuffer = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.1, audioCtx.sampleRate);
+            const source = audioCtx.createBufferSource();
+            source.buffer = silentBuffer;
+            source.connect(audioCtx.destination);
+            source.start();
+            console.log('[LiveAvatar] Audio pre-warmed');
+          } catch (e) {
+            console.log('[LiveAvatar] Audio pre-warm failed:', e);
+          }
         });
 
         session.on(AgentEventsEnum.AVATAR_SPEAK_STARTED, () => {
