@@ -874,19 +874,7 @@ function App() {
         boxShadow: speaking ? `0 0 60px rgba(245,177,80,0.4)` : "0 8px 40px rgba(0,0,0,0.15)",
         transition: "all 0.3s",
       }}>
-        <video ref={videoRef} autoPlay playsInline muted
-          onCanPlayThrough={() => {
-            if (videoRef.current && videoRef.current.muted) {
-              videoRef.current.muted = false;
-              console.log('[LiveAvatar] Audio unmuted after canplaythrough');
-            }
-          }}
-          onPlaying={() => {
-            if (videoRef.current && videoRef.current.muted) {
-              videoRef.current.muted = false;
-              console.log('[LiveAvatar] Audio unmuted on playing');
-            }
-          }}
+        <video ref={videoRef} autoPlay playsInline
           style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center top" }}
         />
         {!videoReady && (
