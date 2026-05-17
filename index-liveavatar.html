@@ -716,6 +716,10 @@ function App() {
           console.log('[LiveAvatar] Avatar speak started');
           setSpeaking(true);
           setLoading(false);
+          // Force play to ensure audio track is active
+          if (videoRef.current && videoRef.current.paused) {
+            videoRef.current.play().catch(e => console.log('[LiveAvatar] Play error:', e));
+          }
           if (window._speakTimeout) clearTimeout(window._speakTimeout);
           window._speakTimeout = setTimeout(() => {
             console.log('[LiveAvatar] Safety: auto-reset speaking');
