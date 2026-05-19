@@ -55,6 +55,22 @@ window.__CONFIG = {
     playOnce();
     injectedStream = dest.stream;
     console.log('[InjectedMic] Audio injected:', audioUrl, 'duration:', audioBuffer.duration.toFixed(2) + 's');
+
+    // If Anam already connected, replace the audio track on its peer connection
+    const anamClient = window.__anamClient;
+    if (anamClient && anamClient.getPeerConnection) {
+      try {
+        const pc = anamClient.getPeerConnection();
+        const newTrack = dest.stream.getAudioTracks()[0];
+        const sender = pc.getSenders().find(s => s.track && s.track.kind === 'audio');
+        if (sender && newTrack) {
+          await sender.replaceTrack(newTrack);
+          console.log('[InjectedMic] Replaced audio track on Anam peer connection');
+        }
+      } catch (e) {
+        console.log('[InjectedMic] Could not replace track:', e.message);
+      }
+    }
     return injectedStream;
   };
 
@@ -754,6 +770,7 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
           systemPrompt: anamSystemPrompt,
         });
         anamClientRef.current = client;
+        window.__anamClient = client;
 
         // Track if we injected a manual greeting so we can replace it when Anam's real one arrives
         let manualGreetingContent = null;
