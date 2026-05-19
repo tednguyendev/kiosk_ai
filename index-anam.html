@@ -818,9 +818,11 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
           }
         });
 
-        // Listen for talk interruption to clear speaking state
+        // Listen for talk interruption to clear speaking state and re-enable mic
         client.addListener(AnamEvent.TALK_STREAM_INTERRUPTED, () => {
+          console.log('[Anam] Talk interrupted — unmuting mic');
           setSpeaking(false);
+          try { client.unmuteInputAudio(); } catch (e) { console.log('[Anam] unmuteInputAudio failed', e); }
         });
 
         // Sync speaking state with actual avatar audio stream, and mute/unmute mic
@@ -881,15 +883,20 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
     speakLockRef.current = true;
     console.log('[Anam] speakWithAnam called:', text.slice(0, 60));
     setSpeaking(true);
+    try { anamClientRef.current.muteInputAudio(); } catch (e) {}
     try {
       await anamClientRef.current.talk(text);
       console.log('[Anam] talk() sent successfully');
       const duration = Math.max(2000, text.length * 150);
-      setTimeout(() => { setSpeaking(false); speakLockRef.current = false; }, duration);
+      setTimeout(() => {
+        setSpeaking(false); speakLockRef.current = false;
+        try { anamClientRef.current.unmuteInputAudio(); } catch (e) {}
+      }, duration);
     } catch (err) {
       console.error('[Anam] talk error:', err);
       speakLockRef.current = false;
       setSpeaking(false);
+      try { anamClientRef.current.unmuteInputAudio(); } catch (e) {}
     }
   }
 
