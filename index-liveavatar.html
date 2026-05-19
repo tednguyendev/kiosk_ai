@@ -14,6 +14,146 @@ window.__CONFIG = {
   GEMINI_MODEL: 'gemini-2.5-flash',
   OPENAI_API_KEY: ''
 };
+
+// ─── Fake Microphone Injection for Testing ───
+// Injects pre-recorded audio (e.g. Chinese test) as mic input for LiveAvatar SDK.
+// Works even if called after the SDK has already started, by replacing tracks
+// on existing RTCPeerConnections.
+(function() {
+  'use strict';
+
+  // ── Track all RTCPeerConnection instances ──
+  const _peerConnections = new Set();
+  if (window.RTCPeerConnection) {
+    const OrigRTCPeerConnection = window.RTCPeerConnection;
+    window.RTCPeerConnection = function(...args) {
+      const pc = new OrigRTCPeerConnection(...args);
+      _peerConnections.add(pc);
+      pc.addEventListener('connectionstatechange', () => {
+        if (pc.connectionState === 'closed') _peerConnections.delete(pc);
+      });
+      return pc;
+    };
+    window.RTCPeerConnection.prototype = OrigRTCPeerConnection.prototype;
+  }
+
+  // ── Patch getUserMedia ──
+  const origGUM = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+  let injectedStream = null;
+  let injectedAudioCtx = null;
+  let gumInterceptCount = 0;
+
+  navigator.mediaDevices.getUserMedia = async function(constraints) {
+    gumInterceptCount++;
+    const wantsAudio = constraints && (constraints.audio === true || typeof constraints.audio === 'object');
+    console.log(`[InjectedMic] getUserMedia #${gumInterceptCount}, wantsAudio=${wantsAudio}, injected=${!!injectedStream}`);
+
+    if (injectedStream && wantsAudio) {
+      console.log('[InjectedMic] → returning injected stream');
+      // Return a clone so multiple consumers don't fight over the same track
+      return injectedStream.clone();
+    }
+    return origGUM(constraints);
+  };
+
+  // ── Replace audio track on all known peer connections ──
+  async function replaceOnAllPeerConnections(stream) {
+    const newTrack = stream.getAudioTracks()[0];
+    if (!newTrack) return;
+
+    let replacedCount = 0;
+    for (const pc of _peerConnections) {
+      const senders = pc.getSenders ? pc.getSenders() : [];
+      for (const sender of senders) {
+        if (sender.track && sender.track.kind === 'audio') {
+          try {
+            await sender.replaceTrack(newTrack);
+            console.log('[InjectedMic] Replaced audio track on peer connection');
+            replacedCount++;
+          } catch (e) {
+            console.warn('[InjectedMic] replaceTrack failed:', e.message);
+          }
+        }
+      }
+    }
+    return replacedCount;
+  }
+
+  // ── Inject audio as mic ──
+  window.injectAudioAsMic = async function(audioUrl, options = {}) {
+    const { loop = true, gain = 1.0 } = options;
+
+    // Clean up previous
+    if (injectedAudioCtx) {
+      try { injectedAudioCtx.close(); } catch (e) {}
+    }
+    injectedStream = null;
+
+    console.log('[InjectedMic] Loading audio:', audioUrl);
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+    injectedAudioCtx = audioCtx;
+
+    const res = await fetch(audioUrl);
+    const blob = await res.blob();
+    const arrayBuffer = await blob.arrayBuffer();
+    const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+
+    const dest = audioCtx.createMediaStreamDestination();
+    const gainNode = audioCtx.createGain();
+    gainNode.gain.value = gain;
+    gainNode.connect(dest);
+
+    let activeSource = null;
+
+    function playOnce() {
+      if (!injectedAudioCtx) return;
+      const source = audioCtx.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(gainNode);
+      source.onended = () => {
+        if (loop && injectedAudioCtx) {
+          // Small gap between loops to avoid clipping
+          setTimeout(playOnce, 50);
+        }
+      };
+      source.start();
+      activeSource = source;
+    }
+
+    playOnce();
+    injectedStream = dest.stream;
+
+    const track = injectedStream.getAudioTracks()[0];
+    if (track) {
+      track._injectedLabel = 'injected-chinese-audio';
+      console.log('[InjectedMic] Stream ready. Track:', track.label, 'duration:', audioBuffer.duration.toFixed(2) + 's', 'loop:', loop);
+    }
+
+    // Try to replace on any already-running peer connections
+    const replaced = await replaceOnAllPeerConnections(injectedStream);
+    console.log('[InjectedMic] Replaced on', replaced, 'existing peer connection(s)');
+
+    return injectedStream;
+  };
+
+  // ── Clear injection ──
+  window.clearInjectedMic = function() {
+    if (injectedAudioCtx) {
+      try { injectedAudioCtx.close(); } catch (e) {}
+      injectedAudioCtx = null;
+    }
+    if (injectedStream) {
+      injectedStream.getTracks().forEach(t => t.stop());
+      injectedStream = null;
+    }
+    console.log('[InjectedMic] Cleared');
+  };
+
+  // ── Convenience: quick Chinese test (plays once, does NOT loop) ──
+  window.testChinese = async function() {
+    return window.injectAudioAsMic('assets/chinese-test.mp3', { loop: false });
+  };
+})();
 </script>
 <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
@@ -145,8 +285,11 @@ Halal rule: pork, lard, char siew, bak kut teh, bak chor mee, pig organ, roast p
   }
 
   if (activeFilters.language === 'zh') {
-    prompt += "\n\n你必须用中文回复。所有内容必须用简体中文书写。";
+    prompt += "\n\n你必须用中文回复。所有内容必须用简体中文书写。推荐摊位时，请使用中文说法，如'第5档'、'5号摊位'。";
   }
+
+  prompt += "\n\nBe friendly, warm, and conversational. Always respond in 4-6 sentences — never fewer than 4.";
+  prompt += "\nReply in plain text only. Do not use markdown, asterisks, bold, italics, bullet points, or any formatting symbols — the text is spoken aloud.";
 
   prompt += "\n\nHere is the stall directory:";
   BRANDS.forEach(b => {
@@ -202,12 +345,13 @@ function perfLogTurn() {
 
 // ─── Whisper + VAD (same as before) ───
 
-async function transcribeAudio(audioBlob) {
+async function transcribeAudio(audioBlob, language = null) {
   const OPENAI_API_KEY = window.__CONFIG.OPENAI_API_KEY;
   const formData = new FormData();
   formData.append('file', audioBlob, 'audio.webm');
   formData.append('model', 'whisper-1');
-  formData.append('language', 'en');
+  // Only specify language if explicitly requested; otherwise Whisper auto-detects
+  if (language) formData.append('language', language);
   formData.append('temperature', '0');
   formData.append('prompt', 'Food court customer asking about stalls, dishes, halal options.');
   formData.append('response_format', 'verbose_json');
@@ -257,8 +401,15 @@ const WHISPER_HALLUCINATION_EXACT = [
   '.', '...', 'music', '[music]', '(music)', 'applause', '[applause]',
 ];
 
-function isHallucination(text) {
+function isHallucination(text, detectedLang = 'en') {
   if (!text) return true;
+  const isChinese = detectedLang === 'zh' || detectedLang === 'zh-cn' || detectedLang === 'zh-tw' || /[\u4e00-\u9fff]/.test(text);
+  // Allow Chinese / non-ASCII if Whisper detected Chinese
+  if (isChinese) {
+    if (text.trim().length === 0) return true;
+    if (/\b(?:https?:\/\/|www\.|\.com|\.org|\.net|\.io)\b/i.test(text)) return true;
+    return false;
+  }
   const norm = text.toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
   if (norm.length < 2) return true;
   if (WHISPER_HALLUCINATION_EXACT.includes(norm)) return true;
@@ -418,12 +569,12 @@ function useVoiceActivity({ enabled, paused, onUtterance, onRejected, onStreamRe
           }
           setIsTranscribing(true);
           try {
-            const { text, noSpeechProb, avgLogprob } = await transcribeAudio(blob);
+            const { text, noSpeechProb, avgLogprob, language: detectedLang } = await transcribeAudio(blob);
             const clean = (text || '').trim();
-            console.log('[VAD] Whisper:', JSON.stringify(clean), 'no_speech:', noSpeechProb.toFixed(2), 'logprob:', avgLogprob.toFixed(2));
+            console.log('[VAD] Whisper:', JSON.stringify(clean), 'lang:', detectedLang, 'no_speech:', noSpeechProb.toFixed(2), 'logprob:', avgLogprob.toFixed(2));
             const lowConfidence = noSpeechProb > WHISPER_NO_SPEECH_THRESHOLD || avgLogprob < WHISPER_LOGPROB_THRESHOLD;
-            if (clean && !isHallucination(clean) && !lowConfidence && onUtteranceRef.current) {
-              onUtteranceRef.current(clean);
+            if (clean && !isHallucination(clean, detectedLang) && !lowConfidence && onUtteranceRef.current) {
+              onUtteranceRef.current(clean, detectedLang);
             } else {
               const reason = !clean ? 'empty' : lowConfidence ? 'low-confidence' : 'hallucination';
               console.log('[VAD] rejected (' + reason + '):', JSON.stringify(clean));
@@ -519,7 +670,7 @@ Here is the stall directory:\n` + BRANDS.map(b =>
   `Stall ${b.stall}: ${b.brand} (${b.cuisine})${b.halal ? ' [Halal]' : ''} - ${b.signature}. ${b.desc}`
 ).join('\n');
 
-async function callGemini(conversationHistory) {
+async function callGemini(conversationHistory, activeFilters = { halal: 'all', language: 'en' }) {
   const GEMINI_API_KEY = window.__CONFIG.GEMINI_API_KEY;
   const GEMINI_MODEL = window.__CONFIG.GEMINI_MODEL;
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
@@ -533,7 +684,7 @@ async function callGemini(conversationHistory) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+      system_instruction: { parts: [{ text: buildSystemPrompt(activeFilters) }] },
       contents,
     })
   });
@@ -558,8 +709,9 @@ const SDK_READY = new Promise(resolve => {
   window.addEventListener('liveavatar-sdk-ready', resolve, { once: true });
 });
 
-async function createLiveAvatarSessionToken(avatarId, voiceId, contextId) {
+async function createLiveAvatarSessionToken(avatarId, voiceId, contextId, language = 'en') {
   const API_KEY = window.__CONFIG.LIVEAVATAR_API_KEY;
+  const isChinese = language === 'zh';
   const res = await fetch('https://api.liveavatar.com/v1/sessions/token', {
     method: 'POST',
     headers: {
@@ -573,8 +725,13 @@ async function createLiveAvatarSessionToken(avatarId, voiceId, contextId) {
       video_settings: { quality: 'high', encoding: 'H264' },
       avatar_persona: {
         voice_id: voiceId,
-        first_message: "Hello! I'm Kimberly, your AI concierge here at Kopitiam, Tan Tock Seng Hospital. We have 21 food stalls with local favourites, halal options, and more. What are you in the mood for?",
-        system_prompt: `You are Kimberly, AI concierge at Kopitiam in Tan Tock Seng Hospital. There are 21 food stalls.\nIMPORTANT: Always recommend exactly ONE stall and ONE dish. Never suggest multiple stalls.\nWhen recommending, always mention the stall number.\nALWAYS make a recommendation — never just ask clarifying questions.\nBe friendly, warm, and conversational. Respond in 4-6 sentences.\n\nHere is the stall directory:\nStall 1: Kaffe Toast (Western) - Toast bread sets with eggs and kaya\nStall 2: Toast Box (Western) - Thick toast with various toppings\nStall 3: Yaohan Kaya Toast (Singaporean) - Traditional kaya toast\nStall 4: Takahashi (Japanese) - Volcano chicken, stone bowls\nStall 5: Thoh @ The Pan (Indian) [Halal] - Prata, thosai, murtabak\nStall 6: Suntown Cafe (Western) - Chicken chop, steak, pasta\nStall 7: Wang Dae Bak (Korean) - BBQ pork, kimchi soup, army stew\nStall 8: Zhou's Kitchen (Chinese) - Porridge, Cantonese-style\nStall 9: Affordable Nasi Lemak (Malay) - Nasi lemak with sides\nStall 10: ILA [India] (Indian) [Halal] - Prata, briyani, Indian snacks\nStall 11: Malay Street (Malay) [Halal] - Nasi lemak, mee rebus\nStall 12: Hong Luo Chinese Pastry (Chinese) - Handmade buns, pau\nStall 13: Nature's Vitamin (Beverages) - Fresh juices, smoothies\nStall 14: Santiago (Western) [Halal] - Chicken rice, roasted meat\nStall 15: Monster Chili Mala Hot Pot (Chinese) [Halal] - Mala hotpot, customizable spice\nStall 16: Chef-on! (Western) [Halal] - Pasta, grill, zi char\nStall 17: Penang Kitchen (Peranakan) - Laksa, char kway teow\nStall 18: Superfish (Chinese) - Fish soup, sliced fish\nStall 19: Coastal Rhythm (Indonesian) [Halal] - Beef rendang, ayam penyet\nStall 20: Tsuru-Hashi (Japanese) - Donburi, udon, salmon\nStall 21: Qing Zun Ge (Chinese) - Herbal soup, vegetarian options`,
+        language: language,
+        first_message: isChinese
+          ? "你好！我是Kimberly，陈笃生医院Kopitiam美食阁的AI礼宾。我们有21个美食摊位，包括本地美食和清真选项等。今天想吃点什么呢？"
+          : "Hello! I'm Kimberly, your AI concierge here at Kopitiam, Tan Tock Seng Hospital. We have 21 food stalls with local favourites, halal options, and more. What are you in the mood for?",
+        system_prompt: isChinese
+          ? `你是Kimberly，陈笃生医院Kopitiam美食阁的AI礼宾。这里有21个美食摊位。\n重要：每次只推荐一个摊位和一道菜。不要推荐多个摊位或多道菜。\n推荐时务必提及摊位号（例如"第5档"）。\n一定要给出推荐——不要只问澄清问题。即使请求模糊（例如"有什么吃的"），也要选出最佳推荐并提供。\n友好、热情、对话式。用4-6句话回复。\n\n摊位目录：\n第1档：Kopi Kiosk（饮品与甜品）- Kopitiam招牌早餐套餐\n第2档：Bread Junction（面包烘焙）[清真] - 新鲜面包\n第3档：Kallang Airport Wanton Mee（云吞面）- 云吞面\n第4档：Teochew Pig Organ Soup（潮州菜）- 咸菜猪杂汤\n第5档：Yuan Wei Su Yu（素食）- 素食套餐\n第6档：Ying Jia Steamed Fish（蒸鱼）- 港式蒸鲈鱼\n第7档：Xiang Chi Mian（肉脞面）- 肉脞面\n第8档：He Jia Econ Rice & Porridge（经济饭粥）- 酸甜鸡\n第9档：Yuan Wei Thai Cuisine（泰国菜）- 冬阴功汤\n第10档：Bu Tang Wang Pepper Soup（胡椒汤）- 白胡椒鸡汤\n第11档：King Grouper Fish Soup（鱼汤）- 潮州式石斑鱼\n第12档：Chinatown HK Roast（港式烧腊）- 三宝饭套餐\n第13档：Kakak Handmade Noodles（板面）[清真] - 手工板面\n第14档：Cinta Hainanese Chicken Rice（鸡饭）[清真] - 海南鸡饭\n第15档：Monster Chili Mala Hot Pot（麻辣火锅）[清真] - 麻辣火锅\n第16档：Beradik Western（西餐）[清真] - 炸鱼薯条\n第17档：Pak Lum Local Delights（本地美食）[清真] - 炒粿条\n第18档：Kim Dae Bak Korean & Japanese（日韩料理）[清真] - 鲭鱼\n第19档：Majulah Nasi Padang（马来料理）[清真] - 椰浆饭配仁当牛肉\n第20档：Y&H Ayam Penyet（印尼菜）[清真] - 印尼炸鸡\n第21档：Ampang YTF & Tangkak Beef Noodle（酿豆腐与牛肉面）[清真] - 安邦酿豆腐`
+          : `You are Kimberly, AI concierge at Kopitiam in Tan Tock Seng Hospital. There are 21 food stalls.\nIMPORTANT: Always recommend exactly ONE stall and ONE dish. Never suggest multiple stalls.\nWhen recommending, always mention the stall number.\nALWAYS make a recommendation — never just ask clarifying questions.\nBe friendly, warm, and conversational. Respond in 4-6 sentences.\n\nHere is the stall directory:\nStall 1: Kopi Kiosk (Drinks & Desserts) - Kopitiam Signature Breakfast Set\nStall 2: Bread Junction (Bread & Bakery) [Halal] - Fresh Bread\nStall 3: Kallang Airport Wanton Mee (Wanton Noodle) - Wanton Noodle\nStall 4: Teochew Pig Organ Soup & Braised (Teochew Cuisine) - Salted Vegetable Pig's Organ Soup\nStall 5: Yuan Wei Su Yu (Vegetarian) - Vegetarian Set Meal\nStall 6: Ying Jia Steamed Fish (Steamed Fish) - HK Steamed Seabass\nStall 7: Xiang Chi Mian (Bak Chor Mee) - Bak Chor Mee\nStall 8: He Jia Econ Rice & Porridge (Economical Rice) - Sweet and Sour Chicken\nStall 9: Yuan Wei Thai Cuisine (Thai) - Tom Yum Soup\nStall 10: Bu Tang Wang Pepper Soup (Pepper Soup) - White Pepper Chicken Soup\nStall 11: King Grouper Fish Soup (Fish Soup) - Teochew Style Grouper\nStall 12: Chinatown HK Roast (HK Roast Meat) - Famous 3 Roast Set Meal\nStall 13: Kakak Handmade Noodles (Ban Mian) [Halal] - Handmade Ban Mian\nStall 14: Cinta Hainanese Chicken Rice (Chicken Rice) [Halal] - Hainanese Chicken Rice\nStall 15: Monster Chili Mala Hot Pot (Mala Hotpot) [Halal] - Mala Hot Pot\nStall 16: Beradik Western (Western Food) [Halal] - Fish & Chips\nStall 17: Pak Lum Local Delights (Local Hawker) [Halal] - Char Kway Teow\nStall 18: Kim Dae Bak Korean & Japanese (Korean & Japanese) [Halal] - Saba Fish\nStall 19: Majulah Nasi Padang (Nasi Padang) [Halal] - Nasi Lemak Beef Rendang\nStall 20: Y&H Ayam Penyet (Indonesian) [Halal] - Ayam Penyet\nStall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] - Ampang Yong Tau Foo`,
         context_id: contextId
       }
     })
@@ -611,24 +768,53 @@ function App() {
   const messagesRef = useRef(messages);
   useEffect(() => { messagesRef.current = messages; }, [messages]);
 
-  async function sendToAgent(text) {
+  function speakWithLiveAvatar(text) {
+    const session = liveAvatarSessionRef.current;
+    if (!session) {
+      console.log('[LiveAvatar] Session not ready, cannot speak');
+      return;
+    }
+    try {
+      if (typeof session.repeat === 'function') {
+        session.repeat(text);
+        console.log('[LiveAvatar] Sent speak_text:', text.slice(0, 60));
+      } else {
+        console.warn('[LiveAvatar] session.repeat() not available');
+      }
+    } catch (e) {
+      console.error('[LiveAvatar] speak error:', e);
+    }
+  }
+
+  async function sendToAgent(text, detectedLang) {
     if (!text.trim()) return;
+
+    // Auto-switch language based on Whisper detection
+    const isChinese = detectedLang === 'zh' || detectedLang === 'zh-cn' || detectedLang === 'zh-tw' || detectedLang === 'cmn';
+    const detectedLanguage = isChinese ? 'zh' : 'en';
+    if (activeFiltersRef.current.language !== detectedLanguage) {
+      const next = { ...activeFiltersRef.current, language: detectedLanguage };
+      setActiveFilters(next);
+      activeFiltersRef.current = next;
+      console.log('[Lang] Auto-detected:', detectedLanguage, 'from Whisper:', detectedLang);
+    }
+
     setMessages(prev => [...prev, { role: 'user', content: text }]);
     setLoading(true);
     try {
       const history = [...messagesRef.current, { role: 'user', content: text }];
-      const reply = await callGemini(history);
+      const reply = await callGemini(history, activeFiltersRef.current);
       setMessages(prev => [...prev, { role: 'assistant', content: reply }]);
 
-      // Try to make LiveAvatar speak the response via data channel
-      // SDK FULL mode handles responses automatically
-
-      // Note: We rely on LiveAvatar to speak the response via data channel.
-      // Browser TTS is disabled so the avatar uses its own voice.
-      console.log('[LiveAvatar] Response sent; waiting for avatar to speak...');
+      // Manually send the response to the avatar (works for any language)
+      speakWithLiveAvatar(reply);
+      console.log('[LiveAvatar] Sent speak_text:', detectedLanguage);
     } catch (err) {
       console.error('Gemini error:', err);
-      setMessages(prev => [...prev, { role: 'assistant', content: "Sorry, I couldn't process that." }]);
+      const errMsg = activeFiltersRef.current.language === 'zh'
+        ? "抱歉，我没能处理好。"
+        : "Sorry, I couldn't process that.";
+      setMessages(prev => [...prev, { role: 'assistant', content: errMsg }]);
     } finally {
       setLoading(false);
     }
@@ -639,14 +825,15 @@ function App() {
   const vadStreamRef = useRef(null);
 
   const { isListening, isSpeaking: userSpeaking, isTranscribing, supported } = useVoiceActivity({
-    enabled: false, // SDK FULL mode handles mic/voice automatically
+    enabled: started, // Always use local VAD; SDK voice chat disabled for auto-language detection
     paused: speaking || loading,
-    onUtterance: (text) => sendToAgentRef.current && sendToAgentRef.current(text),
+    onUtterance: (text, detectedLang) => {
+      if (sendToAgentRef.current) sendToAgentRef.current(text, detectedLang);
+    },
     onRejected: (reason) => console.log('[VAD] rejected:', reason),
     onStreamReady: (stream) => {
       vadStreamRef.current = stream;
       console.log('[VAD] Mic stream ready');
-      // SDK handles its own mic via voiceChat.start(); don't publish VAD stream
     },
   });
 
@@ -689,12 +876,13 @@ function App() {
           LIVEAVATAR_AVATAR_ID,
           LIVEAVATAR_VOICE_ID,
           window.__CONFIG.LIVEAVATAR_CONTEXT_ID,
-          activeFiltersRef.current
+          'en' // Default session language; actual language detected per-turn via Whisper
         );
 
         if (cancelled) return;
 
-        session = new LiveAvatarSession(sessionToken, { voiceChat: true });
+        session = new LiveAvatarSession(sessionToken, { voiceChat: false });
+        console.log('[LiveAvatar] voiceChat: false (manual pipeline for auto-lang)');
         liveAvatarSessionRef.current = session;
         console.log('[LiveAvatar] Session created');
         setAvatarStatus("Starting stream...");
