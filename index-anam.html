@@ -823,18 +823,20 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
           setSpeaking(false);
         });
 
-        // Sync speaking state with actual avatar audio stream
+        // Sync speaking state with actual avatar audio stream, and mute/unmute mic
         if (AnamEvent.AUDIO_STREAM_STARTED) {
           client.addListener(AnamEvent.AUDIO_STREAM_STARTED, () => {
-            console.log('[Anam] Avatar started speaking');
+            console.log('[Anam] Avatar started speaking — muting mic');
             setSpeaking(true);
             setLoading(false);
+            try { client.muteInputAudio(); } catch (e) { console.log('[Anam] muteInputAudio failed', e); }
           });
         }
         if (AnamEvent.AUDIO_STREAM_STOPPED) {
           client.addListener(AnamEvent.AUDIO_STREAM_STOPPED, () => {
-            console.log('[Anam] Avatar stopped speaking');
+            console.log('[Anam] Avatar stopped speaking — unmuting mic');
             setSpeaking(false);
+            try { client.unmuteInputAudio(); } catch (e) { console.log('[Anam] unmuteInputAudio failed', e); }
           });
         }
 
