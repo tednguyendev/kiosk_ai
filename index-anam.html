@@ -640,6 +640,7 @@ function App() {
   const userSpokeFirstRef = useRef(false);
   const greetingTimeoutRef = useRef(null);
   const speakingTimeoutRef = useRef(null);
+  const streamMsgRef = useRef({ id: null, role: null, content: '' });
   const pendingSpeakRef = useRef(null);
   const speakLockRef = useRef(false);
   // Mirror anamConnected into a ref so sendToAgent doesn't read a stale value from its closure
@@ -774,7 +775,39 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
           });
         }
 
-        // Sync chat UI from Anam's conversation history
+        // Real-time streaming text — update chat as each chunk arrives
+        if (AnamEvent.MESSAGE_STREAM_EVENT_RECEIVED) {
+          client.addListener(AnamEvent.MESSAGE_STREAM_EVENT_RECEIVED, (evt) => {
+            if (!evt || !evt.content) return;
+            const role = (evt.role || '').toLowerCase() === 'persona' ? 'assistant' : 'user';
+            const chunk = evt.content;
+            const id = evt.id || `${role}::${Date.now()}`;
+
+            setMessages(prev => {
+              // If this is a new streaming message, create it
+              if (streamMsgRef.current.id !== id) {
+                streamMsgRef.current = { id, role, content: chunk };
+                return [...prev, { role, content: chunk }];
+              }
+              // Same message — append chunk to last matching message
+              streamMsgRef.current.content += chunk;
+              const lastIdx = prev.length - 1;
+              if (lastIdx >= 0 && prev[lastIdx].role === role) {
+                const updated = [...prev];
+                updated[lastIdx] = { ...updated[lastIdx], content: streamMsgRef.current.content };
+                return updated;
+              }
+              return [...prev, { role, content: chunk }];
+            });
+
+            if (role === 'assistant') {
+              setSpeaking(true);
+              setLoading(false);
+            }
+          });
+        }
+
+        // Sync chat UI from Anam's conversation history (final, deduplicated state)
         client.addListener(AnamEvent.MESSAGE_HISTORY_UPDATED, (messages) => {
           if (!Array.isArray(messages)) {
             console.log('[Anam] MESSAGE_HISTORY_UPDATED received non-array:', messages);
@@ -808,6 +841,9 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
             if (newMsgs.length === 0) return prev;
             return [...prev.filter(m => !m._manualGreeting || anamHasGreeting), ...newMsgs];
           });
+
+          // Reset streaming accumulator so next message starts fresh
+          streamMsgRef.current = { id: null, role: null, content: '' };
 
           // Track speaking state based on latest message
           const lastMsg = messages[messages.length - 1];
@@ -874,6 +910,7 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
       cancelled = true;
       if (greetingTimeoutRef.current) { clearTimeout(greetingTimeoutRef.current); greetingTimeoutRef.current = null; }
       if (speakingTimeoutRef.current) { clearTimeout(speakingTimeoutRef.current); speakingTimeoutRef.current = null; }
+      streamMsgRef.current = { id: null, role: null, content: '' };
       if (anamClientRef.current) {
         try { anamClientRef.current.stopStreaming(); } catch (e) {}
         anamClientRef.current = null;
