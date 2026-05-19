@@ -853,6 +853,15 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
             setSpeaking(false);
             setLoading(false);
             if (speakingTimeoutRef.current) { clearTimeout(speakingTimeoutRef.current); speakingTimeoutRef.current = null; }
+            // Auto-detect filters from user's spoken text
+            const userText = lastMsg?.content || '';
+            const detected = parseFiltersFromText(userText);
+            if (detected.halal || detected.language) {
+              const next = { ...activeFiltersRef.current, ...detected };
+              setActiveFilters(next);
+              activeFiltersRef.current = next;
+              console.log('[Filters] detected from speech:', JSON.stringify(detected));
+            }
           } else if (lastRole === 'persona') {
             // Estimate speaking duration and auto-clear
             const content = lastMsg?.content || '';
