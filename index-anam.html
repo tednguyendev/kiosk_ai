@@ -639,6 +639,7 @@ function App() {
   const chatEndRef = useRef(null);
   const userSpokeFirstRef = useRef(false);
   const greetingTimeoutRef = useRef(null);
+  const speakingTimeoutRef = useRef(null);
   const pendingSpeakRef = useRef(null);
   const speakLockRef = useRef(false);
   // Mirror anamConnected into a ref so sendToAgent doesn't read a stale value from its closure
@@ -808,37 +809,40 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
             return [...prev.filter(m => !m._manualGreeting || anamHasGreeting), ...newMsgs];
           });
 
-          // If latest message is from user, clear speaking state
+          // Track speaking state based on latest message
           const lastMsg = messages[messages.length - 1];
           const lastRole = (lastMsg?.role || '').toLowerCase();
           if (lastRole === 'user') {
             userSpokeFirstRef.current = true;
             setSpeaking(false);
             setLoading(false);
+            if (speakingTimeoutRef.current) { clearTimeout(speakingTimeoutRef.current); speakingTimeoutRef.current = null; }
+          } else if (lastRole === 'persona') {
+            // Estimate speaking duration and auto-clear
+            const content = lastMsg?.content || '';
+            const duration = Math.max(3000, content.length * 120);
+            setSpeaking(true);
+            setLoading(false);
+            if (speakingTimeoutRef.current) clearTimeout(speakingTimeoutRef.current);
+            speakingTimeoutRef.current = setTimeout(() => {
+              setSpeaking(false);
+              speakingTimeoutRef.current = null;
+            }, duration);
           }
         });
 
-        // Listen for talk interruption to clear speaking state and re-enable mic
+        // Listen for talk interruption to clear speaking state
         client.addListener(AnamEvent.TALK_STREAM_INTERRUPTED, () => {
-          console.log('[Anam] Talk interrupted — unmuting mic');
+          console.log('[Anam] Talk interrupted');
           setSpeaking(false);
-          try { client.unmuteInputAudio(); } catch (e) { console.log('[Anam] unmuteInputAudio failed', e); }
         });
 
-        // Sync speaking state with actual avatar audio stream, and mute/unmute mic
+        // Sync speaking state with actual avatar audio stream
         if (AnamEvent.AUDIO_STREAM_STARTED) {
           client.addListener(AnamEvent.AUDIO_STREAM_STARTED, () => {
-            console.log('[Anam] Avatar started speaking — muting mic');
+            console.log('[Anam] Audio stream started');
             setSpeaking(true);
             setLoading(false);
-            try { client.muteInputAudio(); } catch (e) { console.log('[Anam] muteInputAudio failed', e); }
-          });
-        }
-        if (AnamEvent.AUDIO_STREAM_STOPPED) {
-          client.addListener(AnamEvent.AUDIO_STREAM_STOPPED, () => {
-            console.log('[Anam] Avatar stopped speaking — unmuting mic');
-            setSpeaking(false);
-            try { client.unmuteInputAudio(); } catch (e) { console.log('[Anam] unmuteInputAudio failed', e); }
           });
         }
 
@@ -869,6 +873,7 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
     return () => {
       cancelled = true;
       if (greetingTimeoutRef.current) { clearTimeout(greetingTimeoutRef.current); greetingTimeoutRef.current = null; }
+      if (speakingTimeoutRef.current) { clearTimeout(speakingTimeoutRef.current); speakingTimeoutRef.current = null; }
       if (anamClientRef.current) {
         try { anamClientRef.current.stopStreaming(); } catch (e) {}
         anamClientRef.current = null;
@@ -883,20 +888,15 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
     speakLockRef.current = true;
     console.log('[Anam] speakWithAnam called:', text.slice(0, 60));
     setSpeaking(true);
-    try { anamClientRef.current.muteInputAudio(); } catch (e) {}
     try {
       await anamClientRef.current.talk(text);
       console.log('[Anam] talk() sent successfully');
       const duration = Math.max(2000, text.length * 150);
-      setTimeout(() => {
-        setSpeaking(false); speakLockRef.current = false;
-        try { anamClientRef.current.unmuteInputAudio(); } catch (e) {}
-      }, duration);
+      setTimeout(() => { setSpeaking(false); speakLockRef.current = false; }, duration);
     } catch (err) {
       console.error('[Anam] talk error:', err);
       speakLockRef.current = false;
       setSpeaking(false);
-      try { anamClientRef.current.unmuteInputAudio(); } catch (e) {}
     }
   }
 
@@ -1293,6 +1293,20 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
             }
           </span>
         </div>
+        {/* Please wait overlay while AI is speaking */}
+        {speaking && (
+          <div style={{
+            padding: "16px 40px", borderRadius: 40,
+            background: "rgba(245, 177, 80, 0.15)",
+            border: "2px solid rgba(245, 177, 80, 0.4)",
+            fontSize: 28, fontWeight: 500,
+            color: "#b3771a", textAlign: "center",
+          }}>
+            {activeFilters.language === 'zh'
+              ? '⏸ 请稍等 — 听完后再说话'
+              : '⏸ Please wait — let me finish first'}
+          </div>
+        )}
         {!anamConnected && (
           <div style={{ color: "#888", fontSize: 28 }}>{anamStatus}</div>
         )}
