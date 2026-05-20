@@ -205,8 +205,9 @@ function getCategoryLabel(key, lang) {
 function parseFiltersFromText(text) {
   const lower = text.toLowerCase();
   const filters = {};
-  if (/\bhalal\b/.test(lower)) filters.halal = "halal";
-  else if (/\b(non[- ]?halal|not halal|no halal)\b/.test(lower)) filters.halal = "non-halal";
+  // Catch misspellings like "hala", "halah", and also "muslim"/"islamic" as halal intent
+  if (/\b(hala[hl]?|halal|muslim|islamic)\b/.test(lower)) filters.halal = "halal";
+  else if (/\b(non[- ]?hala[hl]?|not hala[hl]?|no hala[hl]?)\b/.test(lower)) filters.halal = "non-halal";
   // Language detection
   if (/[\u4e00-\u9fff]/.test(text) || /\b(chinese|zhongwen|中文|华文|华语|普通话)\b/.test(lower)) {
     filters.language = "zh";
@@ -772,49 +773,24 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
         anamClientRef.current = client;
         window.__anamClient = client;
 
-        // Track if we injected a manual greeting so we can replace it when Anam's real one arrives
-        let manualGreetingContent = null;
-
-        // When Anam connection is established, inject a greeting immediately so the user sees
-        // something in chat even if MESSAGE_HISTORY_UPDATED fires late or skips the greeting.
-        if (AnamEvent.CONNECTION_ESTABLISHED) {
-          client.addListener(AnamEvent.CONNECTION_ESTABLISHED, () => {
-            console.log('[Anam] Connection established');
-            setMessages(prev => {
-              // Only inject if chat is still empty
-              if (prev.length > 0) return prev;
-              const greeting = activeFiltersRef.current.language === 'zh'
-                ? '你好！我是Kimberly，Kopitiam的AI礼宾。很高兴为你推荐今天的美食！你想吃点什么呢？'
-                : "Hello! I'm Kimberly, your AI concierge at Kopitiam. I'd love to help you find something delicious today! What are you in the mood for?";
-              manualGreetingContent = greeting;
-              return [{ role: 'assistant', content: greeting, _manualGreeting: true }];
-            });
-          });
-        }
-
         // Real-time streaming text — update chat as each chunk arrives
         if (AnamEvent.MESSAGE_STREAM_EVENT_RECEIVED) {
           client.addListener(AnamEvent.MESSAGE_STREAM_EVENT_RECEIVED, (evt) => {
             if (!evt || !evt.content) return;
             const role = (evt.role || '').toLowerCase() === 'persona' ? 'assistant' : 'user';
             const chunk = evt.content;
-            const id = evt.id || `${role}::${Date.now()}`;
 
             setMessages(prev => {
-              // If this is a new streaming message, create it
-              if (streamMsgRef.current.id !== id) {
-                streamMsgRef.current = { id, role, content: chunk };
-                return [...prev, { role, content: chunk }];
-              }
-              // Same message — append chunk to last matching message
-              streamMsgRef.current.content += chunk;
+              // Accumulate into the last message if it's a streaming message of the same role.
+              // Don't rely on evt.id — Anam may not provide it, causing each chunk to get
+              // a unique Date.now() id and creating separate messages.
               const lastIdx = prev.length - 1;
-              if (lastIdx >= 0 && prev[lastIdx].role === role) {
+              if (lastIdx >= 0 && prev[lastIdx].role === role && prev[lastIdx]._streaming) {
                 const updated = [...prev];
-                updated[lastIdx] = { ...updated[lastIdx], content: streamMsgRef.current.content };
+                updated[lastIdx] = { ...updated[lastIdx], content: prev[lastIdx].content + chunk, _streaming: true };
                 return updated;
               }
-              return [...prev, { role, content: chunk }];
+              return [...prev, { role, content: chunk, _streaming: true }];
             });
 
             if (role === 'assistant') {
@@ -840,23 +816,25 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
             return { role, content };
           }).filter(m => m.content.trim());
 
-          // Merge with existing messages: replace manual greeting if Anam provides one,
-          // otherwise append new messages we haven't seen yet.
+          // Deduplicate within formatted (preserve order)
+          const seenFormatted = new Set();
+          const dedupedFormatted = formatted.filter(m => {
+            const key = m.content.trim();
+            if (seenFormatted.has(key)) return false;
+            seenFormatted.add(key);
+            return true;
+          });
+
+          // Merge with existing messages: streaming placeholders are replaced by history (source of truth)
           setMessages(prev => {
-            const prevMap = new Map(prev.map((m, i) => [m.content.trim(), i]));
-            const hadManualGreeting = prev.length === 1 && prev[0]._manualGreeting;
-            const anamHasGreeting = formatted.length > 0 && formatted[0].role === 'assistant';
+            // Only discard streaming placeholders if history actually has content to replace them.
+            // This prevents losing text if a history update arrives empty or incomplete.
+            const stablePrev = dedupedFormatted.length > 0 ? prev.filter(m => !m._streaming) : prev;
+            const prevMap = new Map(stablePrev.map((m, i) => [m.content.trim(), i]));
 
-            // If we had a manual greeting and Anam now gives us a real greeting, replace it
-            if (hadManualGreeting && anamHasGreeting) {
-              // Use Anam's greeting (first msg) + keep any other local messages
-              return [formatted[0], ...formatted.slice(1).filter(m => !prevMap.has(m.content.trim()))];
-            }
-
-            // Otherwise append only truly new messages
-            const newMsgs = formatted.filter(m => !prevMap.has(m.content.trim()));
-            if (newMsgs.length === 0) return prev;
-            return [...prev.filter(m => !m._manualGreeting || anamHasGreeting), ...newMsgs];
+            const newMsgs = dedupedFormatted.filter(m => !prevMap.has(m.content.trim()));
+            if (newMsgs.length === 0) return stablePrev;
+            return [...stablePrev, ...newMsgs];
           });
 
           // Reset streaming accumulator so next message starts fresh
@@ -1214,8 +1192,8 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
                 fontSize: 32, lineHeight: "42px", color: "#000",
               }}>
                 {activeFilters.language === 'zh'
-                  ? '你好！我是Kimberly，陈笃生医院Kopitiam美食阁的AI礼宾。我们有21个美食摊位，包括本地美食和清真选项等。今天想吃点什么呢？'
-                  : "Hello! I'm Kimberly, your AI concierge here at Kopitiam, Tan Tock Seng Hospital. We have 21 food stalls with local favourites, halal options, and more. What are you in the mood for?"
+                  ? '你好！我是Kimberly，Kopitiam的AI礼宾。很高兴为你推荐今天的美食！你想吃点什么呢？'
+                  : "Hello! I'm Kimberly, your AI concierge at Kopitiam. I'd love to help you find something delicious today! What are you in the mood for?"
                 }
               </div>
             </div>
