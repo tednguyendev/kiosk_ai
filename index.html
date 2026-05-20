@@ -150,6 +150,8 @@ const RED = "#CF463A";
 const GOLD = "#F5B150";
 const DARK_TEXT = "#324157";
 const WHITE = "#FFFFFF";
+const ENGLISH_GREETING = "Hello! I'm Kimberly, your AI concierge at Kopitiam. I'd love to help you find something delicious today! What are you in the mood for?";
+const CHINESE_GREETING = '你好！我是Kimberly，Kopitiam的AI礼宾。很高兴为你推荐今天的美食！你想吃点什么呢？';
 
 // ─── Restaurant Data ───
 
@@ -697,6 +699,13 @@ function App() {
     }
   }, [started]);
 
+  // Initialize greeting in messages when user clicks Start (so it can't be replaced by a truncated Anam greeting)
+  useEffect(() => {
+    if (!started) return;
+    const greeting = activeFiltersRef.current.language === 'zh' ? CHINESE_GREETING : ENGLISH_GREETING;
+    setMessages([{ role: 'assistant', content: greeting }]);
+  }, [started]);
+
   // Connect Anam avatar only after user clicks Start
   useEffect(() => {
     if (!started) return;
@@ -721,7 +730,7 @@ function App() {
 
 GREETING:
 Your VERY FIRST message must ALWAYS be exactly this greeting, word for word:
-"Hello! I'm Kimberly, your AI concierge at Kopitiam. I'd love to help you find something delicious today! What are you in the mood for?"
+ENGLISH_GREETING
 Do not deviate from this greeting. Do not mention stall counts or dietary preferences in the greeting.
 
 IMPORTANT RULES:
@@ -781,6 +790,11 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
             const chunk = evt.content;
 
             setMessages(prev => {
+              // Skip chunks already covered by a stable message (prevents duplicate greeting/reply)
+              const existingStable = prev.find(m => m.role === role && !m._streaming && m.content.trim().includes(chunk.trim()));
+              if (existingStable && role === 'assistant') {
+                return prev;
+              }
               // Accumulate into the last message if it's a streaming message of the same role.
               // Don't rely on evt.id — Anam may not provide it, causing each chunk to get
               // a unique Date.now() id and creating separate messages.
@@ -827,12 +841,20 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
 
           // Merge with existing messages: streaming placeholders are replaced by history (source of truth)
           setMessages(prev => {
+            const expectedGreeting = activeFiltersRef.current.language === 'zh' ? CHINESE_GREETING : ENGLISH_GREETING;
+            const hasFullGreeting = prev.some(m => m.role === 'assistant' && m.content.trim() === expectedGreeting);
+
+            // Filter out truncated greetings if we already have the full greeting
+            const cleanHistory = hasFullGreeting
+              ? dedupedFormatted.filter(m => !(m.role === 'assistant' && expectedGreeting.includes(m.content.trim()) && m.content.trim().length < expectedGreeting.length))
+              : dedupedFormatted;
+
             // Only discard streaming placeholders if history actually has content to replace them.
             // This prevents losing text if a history update arrives empty or incomplete.
-            const stablePrev = dedupedFormatted.length > 0 ? prev.filter(m => !m._streaming) : prev;
+            const stablePrev = cleanHistory.length > 0 ? prev.filter(m => !m._streaming) : prev;
             const prevMap = new Map(stablePrev.map((m, i) => [m.content.trim(), i]));
 
-            const newMsgs = dedupedFormatted.filter(m => !prevMap.has(m.content.trim()));
+            const newMsgs = cleanHistory.filter(m => !prevMap.has(m.content.trim()));
             if (newMsgs.length === 0) return stablePrev;
             return [...stablePrev, ...newMsgs];
           });
@@ -884,6 +906,12 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
             console.log('[Anam] Audio stream started');
             setSpeaking(true);
             setLoading(false);
+            // Ensure video is unmuted and playing so audio is audible
+            const vid = document.getElementById('anam-video');
+            if (vid) {
+              vid.muted = false;
+              if (vid.paused) vid.play().catch(() => {});
+            }
           });
         }
 
@@ -902,6 +930,14 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
           pendingSpeakRef.current = null;
           setTimeout(() => speakWithAnam(text), 300);
           setLoading(false);
+        } else {
+          // Auto-speak greeting on first connection
+          const greeting = activeFiltersRef.current.language === 'zh' ? CHINESE_GREETING : ENGLISH_GREETING;
+          setTimeout(() => {
+            if (anamClientRef.current && anamConnectedRef.current) {
+              speakWithAnam(greeting);
+            }
+          }, 1000);
         }
       } catch (err) {
         console.error("Anam connect error:", err);
@@ -1102,10 +1138,25 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
   // ─── Main Kiosk Screen ───
   return (
     <div style={{
-      width: 2160, height: 3840, position: "relative", background: WHITE, overflow: "hidden",
+      width: 2160, height: 3840, position: "relative", backgroundColor: WHITE, overflow: "hidden",
       backgroundImage: "linear-gradient(0deg, rgba(232,232,232,0.82), rgba(232,232,232,0.82)), url(assets/background.png)",
-      backgroundSize: "cover", backgroundPosition: "center",
     }}>
+      {/* Debug panel */}
+      <div style={{
+        position: "fixed", top: 10, right: 10, zIndex: 9999,
+        background: "rgba(0,0,0,0.85)", color: "#0f0", padding: "16px 24px",
+        borderRadius: 12, fontSize: 22, fontFamily: "monospace",
+        maxWidth: 500, lineHeight: "28px",
+      }}>
+        <div><strong>DEBUG</strong></div>
+        <div>anamConnected: {String(anamConnected)}</div>
+        <div>videoReady: {String(videoReady)}</div>
+        <div>loading: {String(loading)}</div>
+        <div>speaking: {String(speaking)}</div>
+        <div>speakLock: {String(speakLockRef.current)}</div>
+        <div>status: {anamStatus}</div>
+        <div>messages: {messages.length}</div>
+      </div>
 
       {/* ── Header: Logo + AI CONCIERGE ── */}
       <div style={{ position: "absolute", top: 0, left: 0, width: 2160, textAlign: "center" }}>
@@ -1192,8 +1243,8 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
                 fontSize: 32, lineHeight: "42px", color: "#000",
               }}>
                 {activeFilters.language === 'zh'
-                  ? '你好！我是Kimberly，Kopitiam的AI礼宾。很高兴为你推荐今天的美食！你想吃点什么呢？'
-                  : "Hello! I'm Kimberly, your AI concierge at Kopitiam. I'd love to help you find something delicious today! What are you in the mood for?"
+                  ? CHINESE_GREETING
+                  : ENGLISH_GREETING
                 }
               </div>
             </div>
@@ -1323,15 +1374,13 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
             fontSize: 36, fontWeight: 600,
             color: userSpeaking ? RED : (speaking || loading) ? "#888" : DARK_TEXT,
           }}>
-            {!isListening
-              ? (activeFilters.language === 'zh' ? '启动麦克风…' : 'Starting mic…')
+            {!anamConnected
+              ? (activeFilters.language === 'zh' ? '连接中…' : 'Connecting…')
               : speaking
                 ? (activeFilters.language === 'zh' ? 'Kimberly正在说话…' : 'Kimberly is speaking…')
                 : loading
                   ? (activeFilters.language === 'zh' ? '正在思考…' : 'Thinking…')
-                  : userSpeaking
-                    ? (activeFilters.language === 'zh' ? '正在聆听…' : 'Listening…')
-                    : (activeFilters.language === 'zh' ? '请说话 — 我在听' : "Just speak — I'm listening")
+                  : (activeFilters.language === 'zh' ? '请说话 — 我在听' : "Just speak — I'm listening")
             }
           </span>
         </div>
@@ -1522,7 +1571,7 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
         activeFiltersRef.current = resetFilters;
         userSpokeFirstRef.current = false;
         pendingSpeakRef.current = null;
-        const greeting = 'Hello! I am Kimberly, your AI concierge here at Kopitiam. What are you in the mood for today?';
+        const greeting = activeFiltersRef.current.language === 'zh' ? CHINESE_GREETING : ENGLISH_GREETING;
         setMessages([{ role: 'assistant', content: greeting }]);
         if (anamClientRef.current && anamConnected) {
           speakWithAnam(greeting);
