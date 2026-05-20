@@ -6,12 +6,83 @@
 <title>Ask Kimberly - Chat with me</title>
 <script>
 window.__CONFIG = {
-  ANAM_API_KEY: '',
+  ANAM_API_KEY: 'YTYwNjJjMDAtNGIxMC00ODU0LTgyYjAtOGU3YzE5ZTdmNTBmOkVSSVFZS0pjOG4wa05rSGRoT2pHLzhRZ3Y5RzNielBzN3ZsZEdaSGJqM0U9',
   ANAM_AVATAR_ID: '53aca8e4-222e-4de4-9a67-9576025a9d53',
-  GEMINI_API_KEY: '',
+  GEMINI_API_KEY: 'AIzaSyAHCe88d2e8jrApLX9KKyaKEyU-ZJx9a54',
   GEMINI_MODEL: 'gemini-2.5-flash',
   OPENAI_API_KEY: ''
 };
+
+// ─── Fake Microphone Injection for Testing ───
+(function() {
+  const origGUM = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+  let injectedStream = null;
+  let injectedAudioCtx = null;
+
+  navigator.mediaDevices.getUserMedia = async function(constraints) {
+    if (injectedStream && constraints.audio) {
+      console.log('[InjectedMic] Returning injected audio stream');
+      return injectedStream.clone();
+    }
+    return origGUM(constraints);
+  };
+
+  window.injectAudioAsMic = async function(audioUrl, options = {}) {
+    const { loop = false, gain = 1.0 } = options;
+    if (injectedAudioCtx) { try { injectedAudioCtx.close(); } catch (e) {} }
+    injectedStream = null;
+
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+    injectedAudioCtx = audioCtx;
+    const res = await fetch(audioUrl);
+    const blob = await res.blob();
+    const arrayBuffer = await blob.arrayBuffer();
+    const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+
+    const dest = audioCtx.createMediaStreamDestination();
+    const gainNode = audioCtx.createGain();
+    gainNode.gain.value = gain;
+    gainNode.connect(dest);
+
+    function playOnce() {
+      if (!injectedAudioCtx) return;
+      const source = audioCtx.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(gainNode);
+      source.onended = () => { if (loop && injectedAudioCtx) setTimeout(playOnce, 50); };
+      source.start();
+    }
+    playOnce();
+    injectedStream = dest.stream;
+    console.log('[InjectedMic] Audio injected:', audioUrl, 'duration:', audioBuffer.duration.toFixed(2) + 's');
+
+    // If Anam already connected, replace the audio track on its peer connection
+    const anamClient = window.__anamClient;
+    if (anamClient && anamClient.getPeerConnection) {
+      try {
+        const pc = anamClient.getPeerConnection();
+        const newTrack = dest.stream.getAudioTracks()[0];
+        const sender = pc.getSenders().find(s => s.track && s.track.kind === 'audio');
+        if (sender && newTrack) {
+          await sender.replaceTrack(newTrack);
+          console.log('[InjectedMic] Replaced audio track on Anam peer connection');
+        }
+      } catch (e) {
+        console.log('[InjectedMic] Could not replace track:', e.message);
+      }
+    }
+    return injectedStream;
+  };
+
+  window.clearInjectedMic = function() {
+    if (injectedAudioCtx) { try { injectedAudioCtx.close(); } catch (e) {} injectedAudioCtx = null; }
+    if (injectedStream) { injectedStream.getTracks().forEach(t => t.stop()); injectedStream = null; }
+  };
+
+  window.testChinese = async function() {
+    return window.injectAudioAsMic('assets/chinese-test.mp3', { loop: false });
+  };
+})();
 </script>
 <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
@@ -134,8 +205,9 @@ function getCategoryLabel(key, lang) {
 function parseFiltersFromText(text) {
   const lower = text.toLowerCase();
   const filters = {};
-  if (/\bhalal\b/.test(lower)) filters.halal = "halal";
-  else if (/\b(non[- ]?halal|not halal|no halal)\b/.test(lower)) filters.halal = "non-halal";
+  // Catch misspellings like "hala", "halah", and also "muslim"/"islamic" as halal intent
+  if (/\b(hala[hl]?|halal|muslim|islamic)\b/.test(lower)) filters.halal = "halal";
+  else if (/\b(non[- ]?hala[hl]?|not hala[hl]?|no hala[hl]?)\b/.test(lower)) filters.halal = "non-halal";
   // Language detection
   if (/[\u4e00-\u9fff]/.test(text) || /\b(chinese|zhongwen|中文|华文|华语|普通话)\b/.test(lower)) {
     filters.language = "zh";
@@ -584,6 +656,8 @@ function App() {
   const chatEndRef = useRef(null);
   const userSpokeFirstRef = useRef(false);
   const greetingTimeoutRef = useRef(null);
+  const speakingTimeoutRef = useRef(null);
+  const streamMsgRef = useRef({ id: null, role: null, content: '' });
   const pendingSpeakRef = useRef(null);
   const speakLockRef = useRef(false);
   // Mirror anamConnected into a ref so sendToAgent doesn't read a stale value from its closure
@@ -643,20 +717,175 @@ function App() {
         // and gives us clearer errors if the persona config is wrong.
         setAnamStatus("Creating persona session...");
         const { unsafe_createClientWithApiKey } = window.__ANAM;
+        const anamSystemPrompt = `You are Kimberly, AI concierge at Kopitiam Food Court at Tan Tock Seng Hospital. There are 21 food stalls.
+
+GREETING:
+Your VERY FIRST message must ALWAYS be exactly this greeting, word for word:
+"Hello! I'm Kimberly, your AI concierge at Kopitiam. I'd love to help you find something delicious today! What are you in the mood for?"
+Do not deviate from this greeting. Do not mention stall counts or dietary preferences in the greeting.
+
+IMPORTANT RULES:
+- Always recommend exactly ONE stall and ONE dish. Never suggest multiple stalls or multiple dishes.
+- When recommending, always mention the stall number (e.g. "Stall 5" or "第5档").
+- ALWAYS make a recommendation — never just ask a clarifying question. Even if the request is vague, pick your top recommendation and offer it.
+- Respond in the SAME LANGUAGE the user is speaking. If they speak English, reply in English. If they speak Chinese (中文), reply entirely in Chinese (简体中文).
+- Be friendly, warm, and conversational. Respond in 4-6 sentences.
+- Reply in plain text only. No markdown, asterisks, bold, italics, or bullet points.
+
+HALAL RULES:
+- Pork, lard, char siew, bak kut teh, bak chor mee, pig organ, roast pork, wanton (with pork), and alcohol are never halal.
+- If the user asks for something contradictory like "halal pork", politely point out that pork is not halal and suggest a genuinely halal alternative (e.g. halal chicken rice at Stall 14, beef rendang at Stall 19, ayam penyet at Stall 20).
+
+HEALTH RECOMMENDATIONS:
+- For health-related requests (gastric, sore throat, flu, post-surgery), recommend light and gentle options like porridge (Stall 8), vegetarian (Stall 5), or soup (Stall 10/11). Avoid heavy or rich dishes.
+
+STALL DIRECTORY:
+Stall 1: Kopi Kiosk (Drinks & Desserts) — Kopitiam Signature Breakfast Set. Traditional kopi/teh, Yakult Juices, Ice Spin series.
+Stall 2: Bread Junction (Bread & Bakery) [Halal] — Fresh Bread. Muslim-friendly bakery.
+Stall 3: Kallang Airport Wanton Mee (Wanton Noodle) — Wanton Noodle. Recipe from hawker since 1960.
+Stall 4: Teochew Pig Organ Soup & Braised (Teochew Cuisine) — Salted Vegetable Pig's Organ Soup.
+Stall 5: Yuan Wei Su Yu (Vegetarian) — Vegetarian Set Meal. Healthy plant-based eating.
+Stall 6: Ying Jia Steamed Fish (Steamed Fish) — HK Steamed Seabass. Recipe from hotel chef.
+Stall 7: Xiang Chi Mian (Bak Chor Mee) — Bak Chor Mee. Authentic Singapore hawker style.
+Stall 8: He Jia Econ Rice & Porridge (Economical Rice) — Sweet and Sour Chicken.
+Stall 9: Yuan Wei Thai Cuisine (Thai) — Tom Yum Soup. Prepared by experienced Thai chefs.
+Stall 10: Bu Tang Wang Pepper Soup (Pepper Soup) — White Pepper Chicken Soup.
+Stall 11: King Grouper Fish Soup (Fish Soup) — Teochew Style Grouper. Own fish farm in Changi.
+Stall 12: Chinatown HK Roast (HK Roast Meat) — Famous 3 Roast Set Meal.
+Stall 13: Kakak Handmade Noodles (Ban Mian) [Halal] — Handmade Ban Mian.
+Stall 14: Cinta Hainanese Chicken Rice (Chicken Rice) [Halal] — Hainanese Chicken Rice.
+Stall 15: Monster Chili Mala Hot Pot (Mala Hotpot) [Halal] — Mala Hot Pot.
+Stall 16: Beradik Western (Western Food) [Halal] — Fish & Chips.
+Stall 17: Pak Lum Local Delights (Local Hawker) [Halal] — Char Kway Teow.
+Stall 18: Kim Dae Bak Korean & Japanese (Korean & Japanese) [Halal] — Saba Fish.
+Stall 19: Majulah Nasi Padang (Nasi Padang) [Halal] — Nasi Lemak Beef Rendang.
+Stall 20: Y&H Ayam Penyet (Indonesian) [Halal] — Ayam Penyet.
+Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] — Ampang Yong Tau Foo.`;
+
         const client = unsafe_createClientWithApiKey(ANAM_API_KEY, {
           personaId: 'kimberly-kiosk',
           name: 'Kimberly',
           avatarId: ANAM_AVATAR_ID,
           voiceId: '48b9b50b-2542-4bc9-bf73-53e61e4534a5',
           llmId: 'a7cf662c-2ace-4de1-a21e-ef0fbf144bb7',
-          systemPrompt: 'You are Kimberly, AI concierge at Kopitiam Food Court at Tan Tock Seng Hospital.',
-        }, { disableInputAudio: true });
+          systemPrompt: anamSystemPrompt,
+        });
         anamClientRef.current = client;
+        window.__anamClient = client;
+
+        // Real-time streaming text — update chat as each chunk arrives
+        if (AnamEvent.MESSAGE_STREAM_EVENT_RECEIVED) {
+          client.addListener(AnamEvent.MESSAGE_STREAM_EVENT_RECEIVED, (evt) => {
+            if (!evt || !evt.content) return;
+            const role = (evt.role || '').toLowerCase() === 'persona' ? 'assistant' : 'user';
+            const chunk = evt.content;
+
+            setMessages(prev => {
+              // Accumulate into the last message if it's a streaming message of the same role.
+              // Don't rely on evt.id — Anam may not provide it, causing each chunk to get
+              // a unique Date.now() id and creating separate messages.
+              const lastIdx = prev.length - 1;
+              if (lastIdx >= 0 && prev[lastIdx].role === role && prev[lastIdx]._streaming) {
+                const updated = [...prev];
+                updated[lastIdx] = { ...updated[lastIdx], content: prev[lastIdx].content + chunk, _streaming: true };
+                return updated;
+              }
+              return [...prev, { role, content: chunk, _streaming: true }];
+            });
+
+            if (role === 'assistant') {
+              setSpeaking(true);
+              setLoading(false);
+            }
+          });
+        }
+
+        // Sync chat UI from Anam's conversation history (final, deduplicated state)
+        client.addListener(AnamEvent.MESSAGE_HISTORY_UPDATED, (messages) => {
+          if (!Array.isArray(messages)) {
+            console.log('[Anam] MESSAGE_HISTORY_UPDATED received non-array:', messages);
+            return;
+          }
+          console.log('[Anam] Raw messages:', JSON.stringify(messages.slice(-2)));
+
+          // Convert Anam messages to our format — Anam uses role: 'persona' (assistant) | 'user'
+          const formatted = messages.map(m => {
+            const rawRole = (m.role || '').toLowerCase();
+            const role = rawRole === 'persona' || rawRole === 'assistant' ? 'assistant' : 'user';
+            const content = m.content || m.text || (m.parts && m.parts[0] && m.parts[0].text) || '';
+            return { role, content };
+          }).filter(m => m.content.trim());
+
+          // Deduplicate within formatted (preserve order)
+          const seenFormatted = new Set();
+          const dedupedFormatted = formatted.filter(m => {
+            const key = m.content.trim();
+            if (seenFormatted.has(key)) return false;
+            seenFormatted.add(key);
+            return true;
+          });
+
+          // Merge with existing messages: streaming placeholders are replaced by history (source of truth)
+          setMessages(prev => {
+            // Only discard streaming placeholders if history actually has content to replace them.
+            // This prevents losing text if a history update arrives empty or incomplete.
+            const stablePrev = dedupedFormatted.length > 0 ? prev.filter(m => !m._streaming) : prev;
+            const prevMap = new Map(stablePrev.map((m, i) => [m.content.trim(), i]));
+
+            const newMsgs = dedupedFormatted.filter(m => !prevMap.has(m.content.trim()));
+            if (newMsgs.length === 0) return stablePrev;
+            return [...stablePrev, ...newMsgs];
+          });
+
+          // Reset streaming accumulator so next message starts fresh
+          streamMsgRef.current = { id: null, role: null, content: '' };
+
+          // Track speaking state based on latest message
+          const lastMsg = messages[messages.length - 1];
+          const lastRole = (lastMsg?.role || '').toLowerCase();
+          if (lastRole === 'user') {
+            userSpokeFirstRef.current = true;
+            setSpeaking(false);
+            setLoading(false);
+            if (speakingTimeoutRef.current) { clearTimeout(speakingTimeoutRef.current); speakingTimeoutRef.current = null; }
+            // Auto-detect filters from user's spoken text
+            const userText = lastMsg?.content || '';
+            const detected = parseFiltersFromText(userText);
+            if (detected.halal || detected.language) {
+              const next = { ...activeFiltersRef.current, ...detected };
+              setActiveFilters(next);
+              activeFiltersRef.current = next;
+              console.log('[Filters] detected from speech:', JSON.stringify(detected));
+            }
+          } else if (lastRole === 'persona') {
+            // Estimate speaking duration and auto-clear
+            const content = lastMsg?.content || '';
+            const duration = Math.max(3000, content.length * 120);
+            setSpeaking(true);
+            setLoading(false);
+            if (speakingTimeoutRef.current) clearTimeout(speakingTimeoutRef.current);
+            speakingTimeoutRef.current = setTimeout(() => {
+              setSpeaking(false);
+              speakingTimeoutRef.current = null;
+            }, duration);
+          }
+        });
 
         // Listen for talk interruption to clear speaking state
         client.addListener(AnamEvent.TALK_STREAM_INTERRUPTED, () => {
+          console.log('[Anam] Talk interrupted');
           setSpeaking(false);
+          streamMsgRef.current = { id: null, role: null, content: '' };
         });
+
+        // Sync speaking state with actual avatar audio stream
+        if (AnamEvent.AUDIO_STREAM_STARTED) {
+          client.addListener(AnamEvent.AUDIO_STREAM_STARTED, () => {
+            console.log('[Anam] Audio stream started');
+            setSpeaking(true);
+            setLoading(false);
+          });
+        }
 
         // Start streaming to video element
         await client.streamToVideoElement("anam-video");
@@ -673,13 +902,6 @@ function App() {
           pendingSpeakRef.current = null;
           setTimeout(() => speakWithAnam(text), 300);
           setLoading(false);
-        } else if (!userSpokeFirstRef.current) {
-          greetingTimeoutRef.current = setTimeout(() => {
-            const greetingText = activeFiltersRef.current.language === 'zh'
-              ? '你好！我是Kimberly，Kopitiam的AI礼宾。今天想吃点什么呢？'
-              : 'Hello! I am Kimberly, your AI concierge here at Kopitiam. What are you in the mood for today?';
-            speakWithAnam(greetingText);
-          }, 600);
         }
       } catch (err) {
         console.error("Anam connect error:", err);
@@ -692,6 +914,8 @@ function App() {
     return () => {
       cancelled = true;
       if (greetingTimeoutRef.current) { clearTimeout(greetingTimeoutRef.current); greetingTimeoutRef.current = null; }
+      if (speakingTimeoutRef.current) { clearTimeout(speakingTimeoutRef.current); speakingTimeoutRef.current = null; }
+      streamMsgRef.current = { id: null, role: null, content: '' };
       if (anamClientRef.current) {
         try { anamClientRef.current.stopStreaming(); } catch (e) {}
         anamClientRef.current = null;
@@ -747,9 +971,10 @@ function App() {
     setTimeout(() => setRejectionNote(null), 3500);
   }, []);
 
+  // Local VAD disabled — using Anam native STT (disableBrains mode)
   const { isListening, isSpeaking: userSpeaking, isTranscribing, supported } = useVoiceActivity({
-    enabled: started,
-    paused: speaking || loading,
+    enabled: false,
+    paused: true,
     onUtterance: handleUtterance,
     onRejected: handleRejected,
   });
@@ -967,8 +1192,8 @@ function App() {
                 fontSize: 32, lineHeight: "42px", color: "#000",
               }}>
                 {activeFilters.language === 'zh'
-                  ? '你好！我是Kimberly，陈笃生医院Kopitiam美食阁的AI礼宾。我们有21个美食摊位，包括本地美食和清真选项等。今天想吃点什么呢？'
-                  : "Hello! I'm Kimberly, your AI concierge here at Kopitiam, Tan Tock Seng Hospital. We have 21 food stalls with local favourites, halal options, and more. What are you in the mood for?"
+                  ? '你好！我是Kimberly，Kopitiam的AI礼宾。很高兴为你推荐今天的美食！你想吃点什么呢？'
+                  : "Hello! I'm Kimberly, your AI concierge at Kopitiam. I'd love to help you find something delicious today! What are you in the mood for?"
                 }
               </div>
             </div>
@@ -1110,6 +1335,20 @@ function App() {
             }
           </span>
         </div>
+        {/* Please wait overlay while AI is speaking */}
+        {speaking && (
+          <div style={{
+            padding: "16px 40px", borderRadius: 40,
+            background: "rgba(245, 177, 80, 0.15)",
+            border: "2px solid rgba(245, 177, 80, 0.4)",
+            fontSize: 28, fontWeight: 500,
+            color: "#b3771a", textAlign: "center",
+          }}>
+            {activeFilters.language === 'zh'
+              ? '⏸ 请稍等 — 听完后再说话'
+              : '⏸ Please wait — let me finish first'}
+          </div>
+        )}
         {!anamConnected && (
           <div style={{ color: "#888", fontSize: 28 }}>{anamStatus}</div>
         )}
@@ -1283,9 +1522,8 @@ function App() {
         activeFiltersRef.current = resetFilters;
         userSpokeFirstRef.current = false;
         pendingSpeakRef.current = null;
-        const greeting = activeFiltersRef.current.language === 'zh'
-          ? '你好！我是Kimberly，Kopitiam的AI礼宾。今天想吃点什么呢？'
-          : 'Hello! I am Kimberly, your AI concierge here at Kopitiam. What are you in the mood for today?';
+        const greeting = 'Hello! I am Kimberly, your AI concierge here at Kopitiam. What are you in the mood for today?';
+        setMessages([{ role: 'assistant', content: greeting }]);
         if (anamClientRef.current && anamConnected) {
           speakWithAnam(greeting);
         } else {
