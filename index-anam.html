@@ -1543,12 +1543,14 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
           {/* ── Kimberly Avatar ── */}
           <div style={{
             width: 900, height: 900,
+            position: "relative",
             overflow: "hidden",
             borderRadius: "50%",
             border: `6px solid ${GOLD}`,
             boxShadow: speaking ? `0 0 60px rgba(245,177,80,0.4)` : "0 8px 40px rgba(0,0,0,0.15)",
             transition: "all 0.3s",
             flexShrink: 0,
+            background: "linear-gradient(180deg, #f4e6d0 0%, #e8d4b0 100%)",
           }}>
             <video ref={videoRef} id="anam-video" autoPlay playsInline
               onLoadedMetadata={() => { if (videoRef.current) videoRef.current.play().catch(() => {}); }}
