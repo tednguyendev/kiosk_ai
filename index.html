@@ -1501,18 +1501,18 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
               return (
                 <div key={i} style={{
                   minWidth: 580, background: WHITE,
-                  borderRadius: 30, padding: "40px 36px",
+                  borderRadius: 30, padding: "32px 36px 40px",
                   boxShadow: "0 4px 30px rgba(0,0,0,0.1)",
                   border: `4px solid ${isAiPick ? GOLD : "#e0e0e0"}`,
                   flexShrink: 0,
-                  position: "relative",
                 }}>
                   {isAiPick && (
                     <div style={{
-                      position: "absolute", top: -16, left: 24,
+                      display: "inline-block",
                       background: GOLD, color: DARK_TEXT,
                       fontSize: 22, fontWeight: 700,
                       padding: "6px 16px", borderRadius: 12,
+                      marginBottom: 16,
                     }}>{activeFilters.language === 'zh' ? 'Kimberly推荐' : "Kimberly's Pick"}</div>
                   )}
                   <div style={{
