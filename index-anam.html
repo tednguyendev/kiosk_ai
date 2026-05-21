@@ -1476,6 +1476,14 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
               const next = { ...activeFiltersRef.current, language: 'en' };
               setActiveFilters(next);
               activeFiltersRef.current = next;
+              const greeting = ENGLISH_GREETING;
+              setMessages(prev => {
+                const withoutGreeting = prev.filter(m => m.content !== CHINESE_GREETING && m.content !== ENGLISH_GREETING);
+                return [...withoutGreeting, { role: 'assistant', content: greeting }];
+              });
+              if (anamClientRef.current && anamConnectedRef.current) {
+                speakWithAnam(greeting);
+              }
             }} style={{
               padding: "12px 28px", borderRadius: 30, fontSize: 28, fontWeight: 600,
               border: `3px solid ${activeFilters.language === 'en' ? RED : "#ccc"}`,
@@ -1487,6 +1495,14 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
               const next = { ...activeFiltersRef.current, language: 'zh' };
               setActiveFilters(next);
               activeFiltersRef.current = next;
+              const greeting = CHINESE_GREETING;
+              setMessages(prev => {
+                const withoutGreeting = prev.filter(m => m.content !== CHINESE_GREETING && m.content !== ENGLISH_GREETING);
+                return [...withoutGreeting, { role: 'assistant', content: greeting }];
+              });
+              if (anamClientRef.current && anamConnectedRef.current) {
+                speakWithAnam(greeting);
+              }
             }} style={{
               padding: "12px 28px", borderRadius: 30, fontSize: 28, fontWeight: 600,
               border: `3px solid ${activeFilters.language === 'zh' ? RED : "#ccc"}`,
