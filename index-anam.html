@@ -663,6 +663,9 @@ function App() {
   const streamMsgRef = useRef({ id: null, role: null, content: '' });
   const pendingSpeakRef = useRef(null);
   const speakLockRef = useRef(false);
+  const speakingRef = useRef(false);
+  const localTurnPendingRef = useRef(false);
+  const lastLangSwitchRef = useRef(0);
   // Mirror anamConnected into a ref so sendToAgent doesn't read a stale value from its closure
   const anamConnectedRef = useRef(false);
 
@@ -954,6 +957,11 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
         // Sync speaking state with actual avatar audio stream
         if (AnamEvent.AUDIO_STREAM_STARTED) {
           client.addListener(AnamEvent.AUDIO_STREAM_STARTED, () => {
+            if (speakingRef.current || localTurnPendingRef.current) {
+              console.log('[Anam] Native audio suppressed — local turn active');
+              try { client.stopSpeaking(); } catch(e) {}
+              return;
+            }
             console.log('[Anam] Audio stream started');
             setSpeaking(true);
             setLoading(false);
@@ -1010,23 +1018,42 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
     };
   }, [started]);
 
+  function setAnamMicEnabled(enabled) {
+    const client = anamClientRef.current;
+    if (!client || !client.getPeerConnection) return;
+    try {
+      const pc = client.getPeerConnection();
+      const sender = pc.getSenders().find(s => s.track && s.track.kind === 'audio');
+      if (sender && sender.track) {
+        sender.track.enabled = enabled;
+        console.log('[Anam] mic', enabled ? 'ON' : 'OFF');
+      }
+    } catch (e) {
+      console.log('[Anam] mic toggle failed:', e.message);
+    }
+  }
+
   // ─── Anam speak: send text to avatar via talk() ───
   async function speakWithAnam(text) {
     if (!anamClientRef.current) return;
     if (speakLockRef.current) { console.log('[Anam] speak locked, skipping:', text.slice(0, 40)); return; }
     speakLockRef.current = true;
+    speakingRef.current = true;
     console.log('[Anam] speakWithAnam called:', text.slice(0, 60));
     setSpeaking(true);
+    setAnamMicEnabled(false);
     try {
       try { anamClientRef.current.stopSpeaking(); } catch (e) {}
       await anamClientRef.current.talk(text);
       console.log('[Anam] talk() sent successfully');
       const duration = Math.max(2000, text.length * 150);
-      setTimeout(() => { setSpeaking(false); speakLockRef.current = false; }, duration);
+      setTimeout(() => { setSpeaking(false); speakingRef.current = false; speakLockRef.current = false; setAnamMicEnabled(true); }, duration);
     } catch (err) {
       console.error('[Anam] talk error:', err);
       speakLockRef.current = false;
+      speakingRef.current = false;
       setSpeaking(false);
+      setAnamMicEnabled(true);
     }
   }
 
@@ -1087,6 +1114,9 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
 
   async function sendToAgent(text) {
     if (!text.trim()) return;
+    localTurnPendingRef.current = true;
+    setAnamMicEnabled(false);
+    try { if (anamClientRef.current) anamClientRef.current.stopSpeaking(); } catch(e) {}
     const check = filterMessage(text);
     const userMsg = { role: 'user', content: text };
     setMessages(prev => [...prev, userMsg]);
@@ -1094,6 +1124,8 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
     if (!check.allowed) {
       setMessages(prev => [...prev, { role: 'assistant', content: check.reason, filtered: true }]);
       setFiltered(true);
+      localTurnPendingRef.current = false;
+      setAnamMicEnabled(true);
       return;
     }
 
@@ -1132,15 +1164,20 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
       if (anamClientRef.current && anamConnectedRef.current) {
         setLoading(false);
         perf.speakCall = performance.now();
+        localTurnPendingRef.current = false;
         speakWithAnam(reply);
       } else {
         console.log('[App] reply queued — waiting for Anam to connect');
         pendingSpeakRef.current = reply;
+        localTurnPendingRef.current = false;
+        setAnamMicEnabled(true);
       }
     } catch (err) {
       console.error("Gemini error:", err);
       setMessages(prev => [...prev, { role: 'assistant', content: "Error: " + (err.message || err) }]);
       setLoading(false);
+      localTurnPendingRef.current = false;
+      setAnamMicEnabled(true);
     }
   }
 
@@ -1474,24 +1511,18 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <span style={{ fontSize: 32, fontWeight: 600, color: DARK_TEXT }}>'Language:'</span>
             <button onClick={() => {
-              console.log('[LangBtn] English clicked');
               const next = { ...activeFiltersRef.current, language: 'en' };
               setActiveFilters(next);
               activeFiltersRef.current = next;
-              const greeting = ENGLISH_GREETING;
-              setMessages(prev => {
-                const withoutGreeting = prev.filter(m => m.content !== CHINESE_GREETING && m.content !== ENGLISH_GREETING);
-                return [...withoutGreeting, { role: 'assistant', content: greeting }];
-              });
-              console.log('[LangBtn] anamClient:', !!anamClientRef.current, 'anamConnected:', anamConnectedRef.current);
-              if (anamClientRef.current && anamConnectedRef.current) {
-                speakLockRef.current = false;
-                try { anamClientRef.current.stopSpeaking(); } catch(e) {}
-                console.log('[LangBtn] calling speakWithAnam after 500ms:', greeting.slice(0, 40));
-                setTimeout(() => speakWithAnam(greeting), 500);
-              } else {
-                pendingSpeakRef.current = greeting;
-                console.log('[LangBtn] queued greeting, Anam not ready');
+              const now = Date.now();
+              if (now - lastLangSwitchRef.current > 3000) {
+                lastLangSwitchRef.current = now;
+                const greeting = ENGLISH_GREETING;
+                if (anamClientRef.current && anamConnectedRef.current) {
+                  speakLockRef.current = false;
+                  try { anamClientRef.current.stopSpeaking(); } catch(e) {}
+                  setTimeout(() => speakWithAnam(greeting), 300);
+                }
               }
             }} style={{
               padding: "12px 28px", borderRadius: 30, fontSize: 28, fontWeight: 600,
@@ -1501,24 +1532,18 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
               cursor: "pointer", transition: "all 0.2s", whiteSpace: "nowrap",
             }}>English</button>
             <button onClick={() => {
-              console.log('[LangBtn] Chinese clicked');
               const next = { ...activeFiltersRef.current, language: 'zh' };
               setActiveFilters(next);
               activeFiltersRef.current = next;
-              const greeting = CHINESE_GREETING;
-              setMessages(prev => {
-                const withoutGreeting = prev.filter(m => m.content !== CHINESE_GREETING && m.content !== ENGLISH_GREETING);
-                return [...withoutGreeting, { role: 'assistant', content: greeting }];
-              });
-              console.log('[LangBtn] anamClient:', !!anamClientRef.current, 'anamConnected:', anamConnectedRef.current);
-              if (anamClientRef.current && anamConnectedRef.current) {
-                speakLockRef.current = false;
-                try { anamClientRef.current.stopSpeaking(); } catch(e) {}
-                console.log('[LangBtn] calling speakWithAnam after 500ms:', greeting.slice(0, 40));
-                setTimeout(() => speakWithAnam(greeting), 500);
-              } else {
-                pendingSpeakRef.current = greeting;
-                console.log('[LangBtn] queued greeting, Anam not ready');
+              const now = Date.now();
+              if (now - lastLangSwitchRef.current > 3000) {
+                lastLangSwitchRef.current = now;
+                const greeting = CHINESE_GREETING;
+                if (anamClientRef.current && anamConnectedRef.current) {
+                  speakLockRef.current = false;
+                  try { anamClientRef.current.stopSpeaking(); } catch(e) {}
+                  setTimeout(() => speakWithAnam(greeting), 300);
+                }
               }
             }} style={{
               padding: "12px 28px", borderRadius: 30, fontSize: 28, fontWeight: 600,
