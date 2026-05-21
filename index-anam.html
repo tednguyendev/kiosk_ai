@@ -1474,6 +1474,7 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <span style={{ fontSize: 32, fontWeight: 600, color: DARK_TEXT }}>'Language:'</span>
             <button onClick={() => {
+              console.log('[LangBtn] English clicked');
               const next = { ...activeFiltersRef.current, language: 'en' };
               setActiveFilters(next);
               activeFiltersRef.current = next;
@@ -1482,8 +1483,15 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
                 const withoutGreeting = prev.filter(m => m.content !== CHINESE_GREETING && m.content !== ENGLISH_GREETING);
                 return [...withoutGreeting, { role: 'assistant', content: greeting }];
               });
+              console.log('[LangBtn] anamClient:', !!anamClientRef.current, 'anamConnected:', anamConnectedRef.current);
               if (anamClientRef.current && anamConnectedRef.current) {
-                speakWithAnam(greeting);
+                speakLockRef.current = false;
+                try { anamClientRef.current.stopSpeaking(); } catch(e) {}
+                console.log('[LangBtn] calling speakWithAnam after 500ms:', greeting.slice(0, 40));
+                setTimeout(() => speakWithAnam(greeting), 500);
+              } else {
+                pendingSpeakRef.current = greeting;
+                console.log('[LangBtn] queued greeting, Anam not ready');
               }
             }} style={{
               padding: "12px 28px", borderRadius: 30, fontSize: 28, fontWeight: 600,
@@ -1493,6 +1501,7 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
               cursor: "pointer", transition: "all 0.2s", whiteSpace: "nowrap",
             }}>English</button>
             <button onClick={() => {
+              console.log('[LangBtn] Chinese clicked');
               const next = { ...activeFiltersRef.current, language: 'zh' };
               setActiveFilters(next);
               activeFiltersRef.current = next;
@@ -1501,8 +1510,15 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
                 const withoutGreeting = prev.filter(m => m.content !== CHINESE_GREETING && m.content !== ENGLISH_GREETING);
                 return [...withoutGreeting, { role: 'assistant', content: greeting }];
               });
+              console.log('[LangBtn] anamClient:', !!anamClientRef.current, 'anamConnected:', anamConnectedRef.current);
               if (anamClientRef.current && anamConnectedRef.current) {
-                speakWithAnam(greeting);
+                speakLockRef.current = false;
+                try { anamClientRef.current.stopSpeaking(); } catch(e) {}
+                console.log('[LangBtn] calling speakWithAnam after 500ms:', greeting.slice(0, 40));
+                setTimeout(() => speakWithAnam(greeting), 500);
+              } else {
+                pendingSpeakRef.current = greeting;
+                console.log('[LangBtn] queued greeting, Anam not ready');
               }
             }} style={{
               padding: "12px 28px", borderRadius: 30, fontSize: 28, fontWeight: 600,
