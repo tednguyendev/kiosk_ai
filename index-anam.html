@@ -648,6 +648,7 @@ function App() {
   const [anamStatus, setAnamStatus] = useState("Initializing...");
   const [filtered, setFiltered] = useState(false);
   const [recommendations, setRecommendations] = useState([]);
+  const [browseMode, setBrowseMode] = useState(true);
   const [rejectionNote, setRejectionNote] = useState(null);
   // ── Filter state (bidirectional sync with AI) ──
   const [activeFilters, setActiveFilters] = useState({ halal: "all", language: "en" });
@@ -668,14 +669,37 @@ function App() {
   const ANAM_API_KEY = window.__CONFIG?.ANAM_API_KEY;
   const ANAM_AVATAR_ID = window.__CONFIG?.ANAM_AVATAR_ID;
 
-  // Extract recommended stalls from AI response (order-preserving, stall numbers only)
+  // Extract recommended stalls from AI response (order-preserving)
   function extractRecommendations(text) {
     if (!text) return [];
-    const stallMatches = [...text.toLowerCase().matchAll(/stall\s*(\d+)/g)].map(m => parseInt(m[1]));
-    // Deduplicate while preserving order
-    const seen = new Set();
-    const ordered = stallMatches.filter(s => { if (seen.has(s)) return false; seen.add(s); return true; });
-    return ordered.map(s => BRANDS.find(b => b.stall === s)).filter(Boolean);
+    const lower = text.toLowerCase();
+
+    // 1. Primary: explicit "Stall X" or Chinese "第X档"
+    const stallMatches = [...lower.matchAll(/stall\s*(\d+)/g)].map(m => parseInt(m[1]));
+    const chineseMatches = [...text.matchAll(/第\s*(\d+)\s*档/g)].map(m => parseInt(m[1]));
+    const allStallNums = [...stallMatches, ...chineseMatches];
+    const seenNums = new Set();
+    const orderedNums = allStallNums.filter(s => { if (seenNums.has(s)) return false; seenNums.add(s); return true; });
+    if (orderedNums.length > 0) {
+      const recs = orderedNums.map(s => BRANDS.find(b => b.stall === s)).filter(Boolean);
+      console.log('[Recs] extracted by stall number:', recs.map(b => `Stall ${b.stall} ${b.brand}`));
+      return recs;
+    }
+
+    // 2. Fallback: match brand names, cuisines, or signatures in the text
+    const brandMatches = BRANDS.filter(b => {
+      const nameMatch = lower.includes(b.brand.toLowerCase());
+      const cuisineMatch = lower.includes(b.cuisine.toLowerCase());
+      const sigMatch = lower.includes(b.signature.toLowerCase());
+      return nameMatch || cuisineMatch || sigMatch;
+    });
+    if (brandMatches.length > 0) {
+      console.log('[Recs] extracted by brand match:', brandMatches.map(b => `Stall ${b.stall} ${b.brand}`));
+      return brandMatches;
+    }
+
+    console.log('[Recs] no stalls found in text:', text.slice(0, 120));
+    return [];
   }
 
   // Apply active filters to BRANDS
@@ -691,6 +715,11 @@ function App() {
   useEffect(() => {
     if (chatEndRef.current) chatEndRef.current.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
+
+  // When activeFilters change (e.g. user clicks filter buttons), update browse list
+  useEffect(() => {
+    setRecommendations(getFilteredBrands(activeFiltersRef.current));
+  }, [activeFilters.halal]);
 
   // Show all stalls on startup so users can browse immediately
   useEffect(() => {
@@ -839,7 +868,7 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
             return true;
           });
 
-          // Merge with existing messages: streaming placeholders are replaced by history (source of truth)
+          // Merge with existing messages: keep streaming text unless history has better content
           setMessages(prev => {
             const expectedGreeting = activeFiltersRef.current.language === 'zh' ? CHINESE_GREETING : ENGLISH_GREETING;
             const hasFullGreeting = prev.some(m => m.role === 'assistant' && m.content.trim() === expectedGreeting);
@@ -849,14 +878,34 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
               ? dedupedFormatted.filter(m => !(m.role === 'assistant' && expectedGreeting.includes(m.content.trim()) && m.content.trim().length < expectedGreeting.length))
               : dedupedFormatted;
 
-            // Only discard streaming placeholders if history actually has content to replace them.
-            // This prevents losing text if a history update arrives empty or incomplete.
-            const stablePrev = cleanHistory.length > 0 ? prev.filter(m => !m._streaming) : prev;
-            const prevMap = new Map(stablePrev.map((m, i) => [m.content.trim(), i]));
+            // Decide which history messages to actually add:
+            // - Skip exact duplicates already in prev
+            // - Skip history messages that are SHORTER than a streaming message of same role
+            //   (Anam sometimes sends truncated content in history updates)
+            const newMsgs = [];
+            for (const h of cleanHistory) {
+              const exact = prev.find(m => m.content.trim() === h.content.trim());
+              if (exact) continue;
 
-            const newMsgs = cleanHistory.filter(m => !prevMap.has(m.content.trim()));
-            if (newMsgs.length === 0) return stablePrev;
-            return [...stablePrev, ...newMsgs];
+              const streamingLonger = prev.find(m => m.role === h.role && m._streaming && m.content.length > h.content.length && m.content.trim().includes(h.content.trim()));
+              if (streamingLonger) {
+                console.log('[Anam] Keeping streaming text (' + streamingLonger.content.length + ' chars) over truncated history (' + h.content.length + ' chars)');
+                continue;
+              }
+
+              newMsgs.push(h);
+            }
+
+            if (newMsgs.length === 0) {
+              // Nothing new to add — keep prev entirely (preserves streaming text)
+              return prev;
+            }
+
+            // Remove streaming messages of roles that are being replaced by stable history
+            const replacedRoles = new Set(newMsgs.map(m => m.role));
+            const keptPrev = prev.filter(m => !(m._streaming && replacedRoles.has(m.role)));
+
+            return [...keptPrev, ...newMsgs];
           });
 
           // Reset streaming accumulator so next message starts fresh
@@ -890,6 +939,8 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
               setSpeaking(false);
               speakingTimeoutRef.current = null;
             }, duration);
+            // Switch from browse mode to AI recommendation view
+            setBrowseMode(false);
           }
         });
 
@@ -1069,13 +1120,14 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
       console.log('[PERF] Gemini:', ms(perf.geminiStart, perf.geminiEnd));
       const assistantMsg = { role: 'assistant', content: reply };
       setMessages(prev => [...prev, assistantMsg]);
-      // AI recommendations + filtered results
+      // AI recommendations — if AI picked specific stall(s), show ONLY those.
+      // Otherwise fall back to the full filtered browse list.
       const aiRecs = extractRecommendations(reply);
-      const filteredResults = getFilteredBrands(newFilters);
-      // Merge: AI recs first, then filtered results that aren't already in AI recs
-      const seen = new Set(aiRecs.map(b => b.stall));
-      const merged = [...aiRecs, ...filteredResults.filter(b => !seen.has(b.stall))];
-      setRecommendations(merged);
+      if (aiRecs.length > 0) {
+        setBrowseMode(false);
+      } else {
+        setBrowseMode(true);
+      }
       if (anamClientRef.current && anamConnectedRef.current) {
         setLoading(false);
         perf.speakCall = performance.now();
@@ -1409,12 +1461,7 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
               setActiveFilters(next);
               activeFiltersRef.current = next;
               // Refresh displayed stalls immediately
-              const filtered = getFilteredBrands(next);
-              const aiRecs = recommendations.filter(r => {
-                const match = filtered.find(f => f.stall === r.stall);
-                return !!match;
-              });
-              setRecommendations([...aiRecs, ...filtered.filter(f => !aiRecs.find(r => r.stall === f.stall))]);
+              setBrowseMode(true);
             }} style={{
               padding: "12px 28px", borderRadius: 30, fontSize: 28, fontWeight: 600,
               border: `3px solid ${activeFilters.halal === opt.key ? RED : "#ccc"}`,
@@ -1454,8 +1501,7 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
               const next = { halal: "all", language: "en" };
               setActiveFilters(next);
               activeFiltersRef.current = next;
-              const filtered = getFilteredBrands(next);
-              setRecommendations(filtered);
+              setBrowseMode(true);
             }} style={{
               padding: "12px 28px", borderRadius: 30, fontSize: 28, fontWeight: 600,
               border: "3px solid #888", background: "#f5f5f5", color: "#666",
@@ -1466,7 +1512,19 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
       </div>
 
       {/* ── Kimberly's Recommendation ── */}
-      {recommendations.length > 0 && (
+      {(() => {
+        // Walk backward to find the most recent assistant message that contains a stall recommendation
+        let aiRecs = [];
+        for (let i = messages.length - 1; i >= 0; i--) {
+          if (messages[i].role === 'assistant') {
+            const recs = extractRecommendations(messages[i].content);
+            if (recs.length > 0) { aiRecs = recs; break; }
+          }
+        }
+        const displayRecs = (!browseMode && aiRecs.length > 0) ? aiRecs : recommendations;
+        const isAiMode = (!browseMode && aiRecs.length > 0);
+        if (displayRecs.length === 0) return null;
+        return (
         <div style={{
           position: "absolute", left: 0, top: 2150, width: 2160,
           padding: "0 80px",
@@ -1479,20 +1537,16 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
             display: "flex", gap: 30, overflowX: "auto",
             paddingBottom: 20,
           }}>
-            {recommendations.map((brand, i) => {
-              const lastAssistantMsg = messages.filter(m => m.role === 'assistant').pop();
-              const aiStalls = lastAssistantMsg ? extractRecommendations(lastAssistantMsg.content).map(b => b.stall) : [];
-              const isAiPick = aiStalls.includes(brand.stall);
-              return (
+            {displayRecs.map((brand, i) => (
                 <div key={i} style={{
-                  minWidth: 580, background: WHITE,
+                  minWidth: 580, minHeight: 520, background: WHITE,
                   borderRadius: 30, padding: "40px 36px",
                   boxShadow: "0 4px 30px rgba(0,0,0,0.1)",
-                  border: `4px solid ${isAiPick ? GOLD : "#e0e0e0"}`,
+                  border: `4px solid ${isAiMode ? GOLD : "#e0e0e0"}`,
                   flexShrink: 0,
                   position: "relative",
                 }}>
-                  {isAiPick && (
+                  {isAiMode && (
                     <div style={{
                       position: "absolute", top: -16, left: 24,
                       background: GOLD, color: DARK_TEXT,
@@ -1527,11 +1581,11 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
                     fontSize: 28, color: "#888", lineHeight: "38px",
                   }}>{brand.desc}</div>
                 </div>
-              );
-            })}
+            ))}
           </div>
         </div>
-      )}
+      );
+    })()}
 
       {/* ── Bottom Sponsor Bar ── */}
       <div style={{
@@ -1548,6 +1602,7 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
       {/* ── Restart Conversation Button (bottom left) ── */}
       <button disabled={messages.length === 0 || speaking || loading} onClick={() => {
         setMessages([]);
+        setBrowseMode(true);
         setRecommendations([]);
         setFiltered(false);
         setLoading(false);
