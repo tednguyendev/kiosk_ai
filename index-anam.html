@@ -644,6 +644,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const [anamConnected, setAnamConnected] = useState(false);
+  const [anamSessionKey, setAnamSessionKey] = useState(0);
   const [videoReady, setVideoReady] = useState(false);
   const [anamStatus, setAnamStatus] = useState("Initializing...");
   const [filtered, setFiltered] = useState(false);
@@ -758,6 +759,7 @@ function App() {
         // and gives us clearer errors if the persona config is wrong.
         setAnamStatus("Creating persona session...");
         const { unsafe_createClientWithApiKey } = window.__ANAM;
+        const uiLang = activeFiltersRef.current.language;
         const anamSystemPrompt = `You are Kimberly, AI concierge at Kopitiam Food Court at Tan Tock Seng Hospital. There are 21 food stalls.
 
 GREETING:
@@ -769,7 +771,7 @@ IMPORTANT RULES:
 - Always recommend exactly ONE stall and ONE dish. Never suggest multiple stalls or multiple dishes.
 - When recommending, always mention the stall number (e.g. "Stall 5" or "第5档").
 - ALWAYS make a recommendation — never just ask a clarifying question. Even if the request is vague, pick your top recommendation and offer it.
-- CRITICAL: You MUST ALWAYS respond in the SAME LANGUAGE the user is speaking. If they speak English, reply in English. If they speak Chinese (中文), reply entirely in Chinese (简体中文). Never mix languages.
+- CRITICAL: The UI language is currently set to ${uiLang === 'zh' ? 'Chinese (中文)' : 'English'}. You MUST ALWAYS respond entirely in ${uiLang === 'zh' ? 'Chinese (简体中文)' : 'English'}, NO MATTER what language the user speaks. Even if the user speaks a different language, you MUST reply in ${uiLang === 'zh' ? 'Chinese' : 'English'}. Never mix languages.
 - Be friendly, warm, and conversational. Respond in 4-6 sentences.
 - Reply in plain text only. No markdown, asterisks, bold, italics, or bullet points.
 
@@ -1016,7 +1018,7 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
         anamClientRef.current = null;
       }
     };
-  }, [started]);
+  }, [started, anamSessionKey]);
 
   function setAnamMicEnabled(enabled) {
     const client = anamClientRef.current;
@@ -1511,19 +1513,11 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <span style={{ fontSize: 32, fontWeight: 600, color: DARK_TEXT }}>'Language:'</span>
             <button onClick={() => {
+              const prevLang = activeFiltersRef.current.language;
               const next = { ...activeFiltersRef.current, language: 'en' };
               setActiveFilters(next);
               activeFiltersRef.current = next;
-              const now = Date.now();
-              if (now - lastLangSwitchRef.current > 3000) {
-                lastLangSwitchRef.current = now;
-                const greeting = ENGLISH_GREETING;
-                if (anamClientRef.current && anamConnectedRef.current) {
-                  speakLockRef.current = false;
-                  try { anamClientRef.current.stopSpeaking(); } catch(e) {}
-                  setTimeout(() => speakWithAnam(greeting), 300);
-                }
-              }
+              if (prevLang !== 'en') setAnamSessionKey(k => k + 1);
             }} style={{
               padding: "12px 28px", borderRadius: 30, fontSize: 28, fontWeight: 600,
               border: `3px solid ${activeFilters.language === 'en' ? RED : "#ccc"}`,
@@ -1532,19 +1526,11 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
               cursor: "pointer", transition: "all 0.2s", whiteSpace: "nowrap",
             }}>English</button>
             <button onClick={() => {
+              const prevLang = activeFiltersRef.current.language;
               const next = { ...activeFiltersRef.current, language: 'zh' };
               setActiveFilters(next);
               activeFiltersRef.current = next;
-              const now = Date.now();
-              if (now - lastLangSwitchRef.current > 3000) {
-                lastLangSwitchRef.current = now;
-                const greeting = CHINESE_GREETING;
-                if (anamClientRef.current && anamConnectedRef.current) {
-                  speakLockRef.current = false;
-                  try { anamClientRef.current.stopSpeaking(); } catch(e) {}
-                  setTimeout(() => speakWithAnam(greeting), 300);
-                }
-              }
+              if (prevLang !== 'zh') setAnamSessionKey(k => k + 1);
             }} style={{
               padding: "12px 28px", borderRadius: 30, fontSize: 28, fontWeight: 600,
               border: `3px solid ${activeFilters.language === 'zh' ? RED : "#ccc"}`,
