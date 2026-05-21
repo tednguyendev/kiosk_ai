@@ -93,6 +93,7 @@ window.__CONFIG = {
   window.__ANAM_READY = true;
   window.dispatchEvent(new Event('anam-ready'));
   console.log('Anam SDK loaded');
+  console.log('=== KIOSK VERSION: sendUserMessage-lang-switch-v1 ===');
 </script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
@@ -820,6 +821,7 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
         });
         anamClientRef.current = client;
         window.__anamClient = client;
+        console.log('[Anam] Client methods:', Object.getOwnPropertyNames(Object.getPrototypeOf(client)).filter(m => /send|talk|context|message|interrupt/i.test(m)));
 
         // Real-time streaming text — update chat as each chunk arrives
         if (AnamEvent.MESSAGE_STREAM_EVENT_RECEIVED) {
