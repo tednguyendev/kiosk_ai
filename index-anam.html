@@ -93,7 +93,6 @@ window.__CONFIG = {
   window.__ANAM_READY = true;
   window.dispatchEvent(new Event('anam-ready'));
   console.log('Anam SDK loaded');
-  console.log('=== KIOSK VERSION: sendUserMessage-lang-switch-v1 ===');
 </script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
@@ -153,13 +152,6 @@ const DARK_TEXT = "#324157";
 const WHITE = "#FFFFFF";
 const ENGLISH_GREETING = "Hello! I'm Kimberly, your AI concierge at Kopitiam. I'd love to help you find something delicious today! What are you in the mood for?";
 const CHINESE_GREETING = '你好！我是Kimberly，Kopitiam的AI礼宾。很高兴为你推荐今天的美食！你想吃点什么呢？';
-
-// Filter out hidden language-switch messages injected via sendUserMessage
-const HIDDEN_MSG_PREFIXES = ["Please reply in English", "请用中文回答"];
-function isHiddenMessage(text) {
-  if (!text) return false;
-  return HIDDEN_MSG_PREFIXES.some(p => text.includes(p));
-}
 
 // ─── Restaurant Data ───
 
@@ -821,7 +813,6 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
         });
         anamClientRef.current = client;
         window.__anamClient = client;
-        console.log('[Anam] Client methods:', Object.getOwnPropertyNames(Object.getPrototypeOf(client)).filter(m => /send|talk|context|message|interrupt/i.test(m)));
 
         // Real-time streaming text — update chat as each chunk arrives
         if (AnamEvent.MESSAGE_STREAM_EVENT_RECEIVED) {
@@ -829,7 +820,6 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
             if (!evt || !evt.content) return;
             const role = (evt.role || '').toLowerCase() === 'persona' ? 'assistant' : 'user';
             const chunk = evt.content;
-            if (isHiddenMessage(chunk)) return;
 
             setMessages(prev => {
               // Skip chunks already covered by a stable message (prevents duplicate greeting/reply)
@@ -870,7 +860,7 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
             const role = rawRole === 'persona' || rawRole === 'assistant' ? 'assistant' : 'user';
             const content = m.content || m.text || (m.parts && m.parts[0] && m.parts[0].text) || '';
             return { role, content };
-          }).filter(m => m.content.trim() && !isHiddenMessage(m.content));
+          }).filter(m => m.content.trim());
 
           // Deduplicate within formatted (preserve order)
           const seenFormatted = new Set();
@@ -1074,14 +1064,6 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
       clearTimeout(greetingTimeoutRef.current);
       greetingTimeoutRef.current = null;
     }
-    // Send language instruction to Anam along with user's speech
-    const lang = activeFiltersRef.current.language;
-    try {
-      if (anamClientRef.current && anamConnectedRef.current) {
-        const msg = lang === 'zh' ? '请用中文回答。' : 'Please answer in English.';
-        anamClientRef.current.sendUserMessage(msg);
-      }
-    } catch(e) {}
     if (sendToAgentRef.current) sendToAgentRef.current(text);
   }, []);
 
@@ -1532,7 +1514,7 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
                 if (anamClientRef.current && anamConnectedRef.current) {
                   speakLockRef.current = false;
                   try { anamClientRef.current.stopSpeaking(); } catch(e) {}
-                  speakWithAnam(greeting);
+                  setTimeout(() => speakWithAnam(greeting), 300);
                 }
               }
             }} style={{
@@ -1554,7 +1536,7 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
                 if (anamClientRef.current && anamConnectedRef.current) {
                   speakLockRef.current = false;
                   try { anamClientRef.current.stopSpeaking(); } catch(e) {}
-                  speakWithAnam(greeting);
+                  setTimeout(() => speakWithAnam(greeting), 300);
                 }
               }
             }} style={{
