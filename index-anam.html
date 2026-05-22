@@ -999,14 +999,6 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
           pendingSpeakRef.current = null;
           setTimeout(() => speakWithAnam(text), 300);
           setLoading(false);
-        } else {
-          // Auto-speak greeting on first connection
-          const greeting = activeFiltersRef.current.language === 'zh' ? CHINESE_GREETING : ENGLISH_GREETING;
-          setTimeout(() => {
-            if (anamClientRef.current && anamConnectedRef.current) {
-              speakWithAnam(greeting);
-            }
-          }, 1000);
         }
       } catch (err) {
         console.error("Anam connect error:", err);
@@ -1537,12 +1529,6 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
                     anamClientRef.current.sendUserMessage("Please reply in English from now on.");
                   } catch(e) { console.error('[Lang] sendUserMessage error:', e); }
                   speakWithAnam(greeting);
-                  // Suppress any native audio response to sendUserMessage for 1.5s
-                  const suppressUntil = Date.now() + 1500;
-                  const suppressInterval = setInterval(() => {
-                    if (Date.now() > suppressUntil) { clearInterval(suppressInterval); return; }
-                    if (!speakingRef.current) { try { anamClientRef.current.stopSpeaking(); } catch(e) {} }
-                  }, 150);
                 }
               }
             }} style={{
@@ -1569,12 +1555,6 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
                     anamClientRef.current.sendUserMessage("请用中文回答。");
                   } catch(e) { console.error('[Lang] sendUserMessage error:', e); }
                   speakWithAnam(greeting);
-                  // Suppress any native audio response to sendUserMessage for 1.5s
-                  const suppressUntil = Date.now() + 1500;
-                  const suppressInterval = setInterval(() => {
-                    if (Date.now() > suppressUntil) { clearInterval(suppressInterval); return; }
-                    if (!speakingRef.current) { try { anamClientRef.current.stopSpeaking(); } catch(e) {} }
-                  }, 150);
                 }
               }
             }} style={{
