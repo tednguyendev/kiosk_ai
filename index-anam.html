@@ -1536,7 +1536,13 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
                     console.log('[Lang] Sending English switch via sendUserMessage');
                     anamClientRef.current.sendUserMessage("Please reply in English from now on.");
                   } catch(e) { console.error('[Lang] sendUserMessage error:', e); }
-                  setTimeout(() => speakWithAnam(greeting), 2000);
+                  speakWithAnam(greeting);
+                  // Suppress any native audio response to sendUserMessage for 1.5s
+                  const suppressUntil = Date.now() + 1500;
+                  const suppressInterval = setInterval(() => {
+                    if (Date.now() > suppressUntil) { clearInterval(suppressInterval); return; }
+                    if (!speakingRef.current) { try { anamClientRef.current.stopSpeaking(); } catch(e) {} }
+                  }, 150);
                 }
               }
             }} style={{
@@ -1562,7 +1568,13 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
                     console.log('[Lang] Sending Chinese switch via sendUserMessage');
                     anamClientRef.current.sendUserMessage("请用中文回答。");
                   } catch(e) { console.error('[Lang] sendUserMessage error:', e); }
-                  setTimeout(() => speakWithAnam(greeting), 2000);
+                  speakWithAnam(greeting);
+                  // Suppress any native audio response to sendUserMessage for 1.5s
+                  const suppressUntil = Date.now() + 1500;
+                  const suppressInterval = setInterval(() => {
+                    if (Date.now() > suppressUntil) { clearInterval(suppressInterval); return; }
+                    if (!speakingRef.current) { try { anamClientRef.current.stopSpeaking(); } catch(e) {} }
+                  }, 150);
                 }
               }
             }} style={{
