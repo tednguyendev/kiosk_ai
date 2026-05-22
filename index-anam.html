@@ -1528,7 +1528,15 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
                     console.log('[Lang] Sending English switch via sendUserMessage');
                     anamClientRef.current.sendUserMessage("Please reply in English from now on.");
                   } catch(e) { console.error('[Lang] sendUserMessage error:', e); }
-                  speakWithAnam(greeting);
+                  // Aggressively suppress native reintroduction for 2s
+                  const suppressInterval = setInterval(() => {
+                    try { anamClientRef.current.stopSpeaking(); } catch(e) {}
+                    try { anamClientRef.current.interruptPersona(); } catch(e) {}
+                  }, 50);
+                  setTimeout(() => {
+                    clearInterval(suppressInterval);
+                    speakWithAnam(greeting);
+                  }, 2000);
                 }
               }
             }} style={{
@@ -1554,7 +1562,15 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
                     console.log('[Lang] Sending Chinese switch via sendUserMessage');
                     anamClientRef.current.sendUserMessage("请用中文回答。");
                   } catch(e) { console.error('[Lang] sendUserMessage error:', e); }
-                  speakWithAnam(greeting);
+                  // Aggressively suppress native reintroduction for 2s
+                  const suppressInterval = setInterval(() => {
+                    try { anamClientRef.current.stopSpeaking(); } catch(e) {}
+                    try { anamClientRef.current.interruptPersona(); } catch(e) {}
+                  }, 50);
+                  setTimeout(() => {
+                    clearInterval(suppressInterval);
+                    speakWithAnam(greeting);
+                  }, 2000);
                 }
               }
             }} style={{
