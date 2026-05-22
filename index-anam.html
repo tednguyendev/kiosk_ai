@@ -666,6 +666,7 @@ function App() {
   const speakingRef = useRef(false);
   const localTurnPendingRef = useRef(false);
   const lastLangSwitchRef = useRef(0);
+  const idleTimeoutRef = useRef(null);
   // Mirror anamConnected into a ref so sendToAgent doesn't read a stale value from its closure
   const anamConnectedRef = useRef(false);
 
@@ -974,6 +975,14 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
           });
         }
 
+        // Return to home screen when connection closes (e.g. idle timeout)
+        if (AnamEvent.CONNECTION_CLOSED) {
+          client.addListener(AnamEvent.CONNECTION_CLOSED, (reason) => {
+            console.log('[Anam] Connection closed:', reason);
+            setStarted(false);
+          });
+        }
+
         // Start streaming to video element
         await client.streamToVideoElement("anam-video");
         if (cancelled) return;
@@ -1103,6 +1112,22 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
       setSpeaking(false);
     }
   }, [userSpeaking, speaking]);
+
+  // ── Idle timeout: return to home after 45s of inactivity ──
+  useEffect(() => {
+    if (!started) return;
+    function resetTimer() {
+      if (idleTimeoutRef.current) clearTimeout(idleTimeoutRef.current);
+      idleTimeoutRef.current = setTimeout(() => {
+        console.log('[App] Idle timeout — returning to home screen');
+        setStarted(false);
+      }, 45000);
+    }
+    resetTimer();
+    return () => {
+      if (idleTimeoutRef.current) clearTimeout(idleTimeoutRef.current);
+    };
+  }, [started, messages.length, speaking, loading]);
 
   async function sendToAgent(text) {
     if (!text.trim()) return;
@@ -1234,7 +1259,7 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
         <img src="assets/kopitiam-logo.png" alt="Kopitiam" style={{
           width: 1222, height: "auto", margin: "0 auto", display: "block",
         }} onError={(e) => {
-          e.target.outerHTML = '<div style="font-size:120px;font-weight:800;color:#CF463A;font-style:italic;margin:20px 0;">KOPITIAM</div>';
+          e.target.style.display = 'none';
         }} />
         <div style={{
           fontWeight: 500, fontSize: 40, lineHeight: "48px", letterSpacing: "0.2em",
@@ -1669,7 +1694,7 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
         <img src="assets/sponsor-bar.png" alt="Sponsors" style={{
           width: "100%", height: 386, objectFit: "cover",
         }} onError={(e) => {
-          e.target.outerHTML = '<div style="width:100%;height:386px;background:#f5f5f5;display:flex;align-items:center;justify-content:center;color:#ccc;font-size:40px;">Sponsor Bar</div>';
+          e.target.style.display = 'none';
         }} />
       </div>
 

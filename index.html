@@ -662,6 +662,8 @@ function App() {
   const streamMsgRef = useRef({ id: null, role: null, content: '' });
   const pendingSpeakRef = useRef(null);
   const speakLockRef = useRef(false);
+  const lastLangSwitchRef = useRef(0);
+  const idleTimeoutRef = useRef(null);
   // Mirror anamConnected into a ref so sendToAgent doesn't read a stale value from its closure
   const anamConnectedRef = useRef(false);
 
@@ -727,11 +729,6 @@ function App() {
         setAnamStatus("Creating persona session...");
         const { unsafe_createClientWithApiKey } = window.__ANAM;
         const anamSystemPrompt = `You are Kimberly, AI concierge at Kopitiam Food Court at Tan Tock Seng Hospital. There are 21 food stalls.
-
-GREETING:
-Your VERY FIRST message must ALWAYS be exactly this greeting, word for word:
-ENGLISH_GREETING
-Do not deviate from this greeting. Do not mention stall counts or dietary preferences in the greeting.
 
 IMPORTANT RULES:
 - Always recommend exactly ONE stall and ONE dish. Never suggest multiple stalls or multiple dishes.
@@ -897,6 +894,7 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
         client.addListener(AnamEvent.TALK_STREAM_INTERRUPTED, () => {
           console.log('[Anam] Talk interrupted');
           setSpeaking(false);
+          speakLockRef.current = false;
           streamMsgRef.current = { id: null, role: null, content: '' };
         });
 
@@ -912,6 +910,14 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
               vid.muted = false;
               if (vid.paused) vid.play().catch(() => {});
             }
+          });
+        }
+
+        // Return to home screen when connection closes (e.g. idle timeout)
+        if (AnamEvent.CONNECTION_CLOSED) {
+          client.addListener(AnamEvent.CONNECTION_CLOSED, (reason) => {
+            console.log('[Anam] Connection closed:', reason);
+            setStarted(false);
           });
         }
 
@@ -933,7 +939,7 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
         } else {
           // Auto-speak greeting on first connection
           const greeting = activeFiltersRef.current.language === 'zh' ? CHINESE_GREETING : ENGLISH_GREETING;
-          setTimeout(() => {
+          greetingTimeoutRef.current = setTimeout(() => {
             if (anamClientRef.current && anamConnectedRef.current) {
               speakWithAnam(greeting);
             }
@@ -1033,6 +1039,22 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
     }
   }, [userSpeaking, speaking]);
 
+  // ── Idle timeout: return to home after 45s of inactivity ──
+  useEffect(() => {
+    if (!started) return;
+    function resetTimer() {
+      if (idleTimeoutRef.current) clearTimeout(idleTimeoutRef.current);
+      idleTimeoutRef.current = setTimeout(() => {
+        console.log('[App] Idle timeout — returning to home screen');
+        setStarted(false);
+      }, 45000);
+    }
+    resetTimer();
+    return () => {
+      if (idleTimeoutRef.current) clearTimeout(idleTimeoutRef.current);
+    };
+  }, [started, messages.length, speaking, loading]);
+
   async function sendToAgent(text) {
     if (!text.trim()) return;
     const check = filterMessage(text);
@@ -1123,6 +1145,33 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
         {/* Logo */}
         <img src="assets/kopitiam-logo.png" alt="Kopitiam" style={{ width: 800, marginBottom: 40 }} onError={(e) => { e.target.style.display = 'none'; }} />
         <div style={{ fontSize: 64, fontWeight: 600, color: "#000", marginBottom: 40 }}>AI CONCIERGE</div>
+
+        {/* Language selection before starting */}
+        <div style={{ display: "flex", gap: 20, marginBottom: 40 }}>
+          <button onClick={() => {
+            const next = { ...activeFiltersRef.current, language: 'en' };
+            setActiveFilters(next);
+            activeFiltersRef.current = next;
+          }} style={{
+            padding: "20px 50px", fontSize: 36, fontWeight: 600,
+            border: `4px solid ${activeFilters.language === 'en' ? RED : "#ccc"}`,
+            background: activeFilters.language === 'en' ? RED : WHITE,
+            color: activeFilters.language === 'en' ? WHITE : DARK_TEXT,
+            borderRadius: 20, cursor: "pointer", transition: "all 0.2s",
+          }}>English</button>
+          <button onClick={() => {
+            const next = { ...activeFiltersRef.current, language: 'zh' };
+            setActiveFilters(next);
+            activeFiltersRef.current = next;
+          }} style={{
+            padding: "20px 50px", fontSize: 36, fontWeight: 600,
+            border: `4px solid ${activeFilters.language === 'zh' ? RED : "#ccc"}`,
+            background: activeFilters.language === 'zh' ? RED : WHITE,
+            color: activeFilters.language === 'zh' ? WHITE : DARK_TEXT,
+            borderRadius: 20, cursor: "pointer", transition: "all 0.2s",
+          }}>中文</button>
+        </div>
+
         <button onClick={() => setStarted(true)} style={{
           padding: "40px 100px", background: RED, color: WHITE,
           border: "none", borderRadius: 30, fontSize: 48, fontWeight: 700,
@@ -1167,7 +1216,7 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
         <img src="assets/kopitiam-logo.png" alt="Kopitiam" style={{
           width: 1222, height: "auto", margin: "0 auto", display: "block",
         }} onError={(e) => {
-          e.target.outerHTML = '<div style="font-size:120px;font-weight:800;color:#CF463A;font-style:italic;margin:20px 0;">KOPITIAM</div>';
+          e.target.style.display = 'none';
         }} />
         <div style={{
           fontWeight: 500, fontSize: 40, lineHeight: "48px", letterSpacing: "0.2em",
@@ -1442,9 +1491,20 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
           {/* Language toggle */}
           <div style={{ display: "flex", gap: 0, borderRadius: 30, overflow: "hidden", border: `3px solid ${RED}` }}>
             <button onClick={() => {
+              const prevLang = activeFiltersRef.current.language;
               const next = { ...activeFiltersRef.current, language: 'en' };
               setActiveFilters(next);
               activeFiltersRef.current = next;
+              const now = Date.now();
+              if (prevLang !== 'en' && now - lastLangSwitchRef.current > 3000) {
+                lastLangSwitchRef.current = now;
+                const greeting = ENGLISH_GREETING;
+                if (anamClientRef.current && anamConnectedRef.current) {
+                  speakLockRef.current = false;
+                  try { anamClientRef.current.stopSpeaking(); } catch(e) {}
+                  setTimeout(() => speakWithAnam(greeting), 300);
+                }
+              }
             }} style={{
               padding: "12px 28px", fontSize: 28, fontWeight: 600,
               background: activeFilters.language === 'en' ? RED : WHITE,
@@ -1452,9 +1512,20 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
               border: "none", cursor: "pointer",
             }}>English</button>
             <button onClick={() => {
+              const prevLang = activeFiltersRef.current.language;
               const next = { ...activeFiltersRef.current, language: 'zh' };
               setActiveFilters(next);
               activeFiltersRef.current = next;
+              const now = Date.now();
+              if (prevLang !== 'zh' && now - lastLangSwitchRef.current > 3000) {
+                lastLangSwitchRef.current = now;
+                const greeting = CHINESE_GREETING;
+                if (anamClientRef.current && anamConnectedRef.current) {
+                  speakLockRef.current = false;
+                  try { anamClientRef.current.stopSpeaking(); } catch(e) {}
+                  setTimeout(() => speakWithAnam(greeting), 300);
+                }
+              }
             }} style={{
               padding: "12px 28px", fontSize: 28, fontWeight: 600,
               background: activeFilters.language === 'zh' ? RED : WHITE,
@@ -1555,7 +1626,7 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
         <img src="assets/sponsor-bar.png" alt="Sponsors" style={{
           width: "100%", height: "100%", objectFit: "cover",
         }} onError={(e) => {
-          e.target.outerHTML = '<div style="width:100%;height:100%;background:#f5f5f5;display:flex;align-items:center;justify-content:center;color:#ccc;font-size:40px;">Sponsor Bar</div>';
+          e.target.style.display = 'none';
         }} />
       </div>
 
