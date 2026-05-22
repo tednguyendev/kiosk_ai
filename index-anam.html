@@ -1514,6 +1514,7 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
                 if (anamClientRef.current && anamConnectedRef.current) {
                   speakLockRef.current = false;
                   try { anamClientRef.current.stopSpeaking(); } catch(e) {}
+                  try { anamClientRef.current.sendUserMessage("Please reply in English from now on."); } catch(e) {}
                   setTimeout(() => speakWithAnam(greeting), 300);
                 }
               }
@@ -1536,6 +1537,7 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
                 if (anamClientRef.current && anamConnectedRef.current) {
                   speakLockRef.current = false;
                   try { anamClientRef.current.stopSpeaking(); } catch(e) {}
+                  try { anamClientRef.current.sendUserMessage("请用中文回答。"); } catch(e) {}
                   setTimeout(() => speakWithAnam(greeting), 300);
                 }
               }
