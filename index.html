@@ -2,12 +2,12 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=2160, initial-scale=1.0">
+<meta name="viewport" content="width=2160, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Ask Kimberly - Chat with me</title>
 <script>
 window.__CONFIG = {
   ANAM_API_KEY: 'YTYwNjJjMDAtNGIxMC00ODU0LTgyYjAtOGU3YzE5ZTdmNTBmOkVSSVFZS0pjOG4wa05rSGRoT2pHLzhRZ3Y5RzNielBzN3ZsZEdaSGJqM0U9',
-  ANAM_AVATAR_ID: '53aca8e4-222e-4de4-9a67-9576025a9d53',
+  ANAM_AVATAR_ID: '7c4129d7-76ec-47da-bd44-3c92feea24fa',
   GEMINI_API_KEY: 'AIzaSyAHCe88d2e8jrApLX9KKyaKEyU-ZJx9a54',
   GEMINI_MODEL: 'gemini-2.5-flash',
   OPENAI_API_KEY: ''
@@ -88,6 +88,34 @@ window.__CONFIG = {
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <script type="module">
+  let lastTouchEnd = 0;
+
+  document.addEventListener('touchend', function (event) {
+      const now = Date.now();
+
+      if (now - lastTouchEnd <= 300) {
+          event.preventDefault();
+      }
+
+      lastTouchEnd = now;
+  }, { passive: false });
+
+  document.addEventListener('touchmove', function (e) {
+      if (e.touches.length > 1) {
+          e.preventDefault();
+      }
+  }, { passive: false });
+  document.addEventListener('gesturestart', function (e) {
+      e.preventDefault();
+  });
+
+  document.addEventListener('gesturechange', function (e) {
+      e.preventDefault();
+  });
+
+  document.addEventListener('gestureend', function (e) {
+      e.preventDefault();
+  });
   import { createClient, unsafe_createClientWithApiKey, AnamEvent } from 'https://esm.sh/@anam-ai/js-sdk@latest';
   window.__ANAM = { createClient, unsafe_createClientWithApiKey, AnamEvent };
   window.__ANAM_READY = true;
@@ -162,7 +190,7 @@ const BRANDS = [
   { stall: 2, brand: "Bread Junction", cuisine: "Bread & Bakery", halal: true, spicy: false, category: "light", signature: "Fresh Bread", desc: "Muslim-friendly bakery with fresh bread and pastries." },
   { stall: 3, brand: "Kallang Airport Wanton Mee", cuisine: "Wanton Noodle", halal: false, spicy: false, category: "chinese", signature: "Wanton Noodle", desc: "Recipe from hawker selling since 1960. Delicious Char Siew, piquant chilli sauce, crispy pork lard, hand-wrapped wantons." },
   { stall: 4, brand: "Teochew Pig Organ Soup & Braised", cuisine: "Teochew Cuisine", halal: false, spicy: false, category: "chinese", signature: "Salted Vegetable Pig's Organ Soup", desc: "Authentic Teochew flavours. Must-tries: Pig's Organ Soup, Teochew noodles, Chaoshan braised meat." },
-  { stall: 5, brand: "Yuan Wei Su Yu", cuisine: "Vegetarian", halal: false, spicy: false, category: "light", signature: "Vegetarian Set Meal", desc: "Healthy plant-based eating. Low Oil, Low Salt, No MSG, fresh ingredients." },
+  { stall: 5, brand: "Yuan Wei Su Yu", cuisine: "Vegetarian", halal: false, spicy: false, vegetarian: true, category: "light", signature: "Vegetarian Set Meal", desc: "Healthy plant-based eating. Low Oil, Low Salt, No MSG, fresh ingredients." },
   { stall: 6, brand: "Ying Jia Steamed Fish", cuisine: "Steamed Fish", halal: false, spicy: false, category: "chinese", signature: "HK Steamed Seabass", desc: "Recipe from hotel chef (20 years). Known for signature garlic sauce. Also: Cai Pu Steamed Seabass, Bean Sauce Seabass." },
   { stall: 7, brand: "Xiang Chi Mian", cuisine: "Bak Chor Mee", halal: false, spicy: true, category: "local", signature: "Bak Chor Mee", desc: "Authentic Singapore hawker Bak Chor Mee. Sambal chilli, black vinegar, crispy pork lard. Pork slices, liver, meatball, minced meat, braised shiitake." },
   { stall: 8, brand: "He Jia Econ Rice & Porridge", cuisine: "Economical Rice", halal: false, spicy: true, category: "local", signature: "Sweet and Sour Chicken", desc: "Established 2011. Over 10 dishes daily. Also: Spicy Sambal Prawns, Braised Tofu." },
@@ -207,15 +235,24 @@ function getCategoryLabel(key, lang) {
 function parseFiltersFromText(text) {
   const lower = text.toLowerCase();
   const filters = {};
-  // Catch misspellings like "hala", "halah", and also "muslim"/"islamic" as halal intent
+  // Halal
   if (/\b(hala[hl]?|halal|muslim|islamic)\b/.test(lower)) filters.halal = "halal";
   else if (/\b(non[- ]?hala[hl]?|not hala[hl]?|no hala[hl]?)\b/.test(lower)) filters.halal = "non-halal";
-  // Language detection
+  // Language
   if (/[\u4e00-\u9fff]/.test(text) || /\b(chinese|zhongwen|中文|华文|华语|普通话)\b/.test(lower)) {
     filters.language = "zh";
   } else if (/\b(english|英文|英语)\b/.test(lower)) {
     filters.language = "en";
   }
+  // Spicy
+  if (/\b(spicy|hot food|mala|chilli|chili|sambal)\b/.test(lower)) filters.spicy = true;
+  else if (/\b(not spicy|no spicy|mild|not hot|less spicy|no chilli|no chili)\b/.test(lower)) filters.spicy = false;
+  // Vegetarian
+  if (/\b(vegetarian|vegan|plant[- ]?based|no meat|meatless)\b/.test(lower)) filters.vegetarian = true;
+  else if (/\b(not vegetarian|want meat|with meat|meat lover)\b/.test(lower)) filters.vegetarian = false;
+  // Healthy / light
+  if (/\b(healthy|light food|diet|low[- ]?cal|salad|clean eating)\b/.test(lower)) filters.healthy = true;
+  else if (/\b(unhealthy|heavy|fried food|oily|greasy|rich food)\b/.test(lower)) filters.healthy = false;
   return filters;
 }
 
@@ -229,12 +266,22 @@ Halal rule: pork, lard, char siew, bak kut teh, bak chor mee, pig organ, roast p
 Be friendly, warm, and conversational. Always respond in 4-6 sentences — never fewer than 4.
 Reply in plain text only. Do not use markdown, asterisks, bold, italics, bullet points, or any formatting symbols — the text is spoken aloud.`;
 
-  if (activeFilters.halal !== "all" || activeFilters.language !== "en") {
-    prompt += "\n\nCURRENT ACTIVE FILTERS — ONLY recommend stalls that match ALL of these:";
-    if (activeFilters.halal === "halal") prompt += "\n- Halal: YES (only halal-certified stalls)";
-    if (activeFilters.halal === "non-halal") prompt += "\n- Halal: NO (only non-halal stalls)";
-    if (activeFilters.language === 'zh') prompt += "\n- Language: Chinese (用户说中文，你必须用中文回复)";
-    prompt += "\nIf no stall matches ALL filters, politely say so and suggest the closest match.";
+  const activeTraits = [];
+  if (activeFilters.halal && activeFilters.halal !== "all") {
+    activeTraits.push(activeFilters.halal === "halal" ? "- Halal: YES (only halal-certified stalls)" : "- Halal: NO (only non-halal stalls)");
+  }
+  if (activeFilters.language === 'zh') activeTraits.push("- Language: Chinese (用户说中文，你必须用中文回复)");
+  if (activeFilters.spicy === true) activeTraits.push("- Spicy: YES (prefer spicy food)");
+  if (activeFilters.spicy === false) activeTraits.push("- Spicy: NO (prefer mild/non-spicy food)");
+  if (activeFilters.vegetarian === true) activeTraits.push("- Vegetarian: YES (vegetarian food only)");
+  if (activeFilters.vegetarian === false) activeTraits.push("- Vegetarian: NO (meat/seafood is OK)");
+  if (activeFilters.healthy === true) activeTraits.push("- Healthy/Light: YES (prefer healthy/light options)");
+  if (activeFilters.healthy === false) activeTraits.push("- Healthy/Light: NO (rich/heavy food is OK)");
+
+  if (activeTraits.length > 0) {
+    prompt += "\n\nCURRENT ACTIVE USER PREFERENCES — The user has previously expressed these preferences. ONLY recommend stalls that match ALL of them:";
+    prompt += "\n" + activeTraits.join("\n");
+    prompt += "\nIf no stall matches ALL preferences, politely say so and suggest the closest match.";
   }
 
   // Language instruction — always include
@@ -245,7 +292,7 @@ Reply in plain text only. Do not use markdown, asterisks, bold, italics, bullet 
   }
 
   prompt += "\n\nHere is the stall directory:\n" + BRANDS.map(b =>
-    `Stall ${b.stall}: ${b.brand} (${b.cuisine})${b.halal ? ' [Halal]' : ''} [${getCategoryLabel(b.category, activeFilters.language)}] - ${b.signature}. ${b.desc}`
+    `Stall ${b.stall}: ${b.brand} (${b.cuisine})${b.halal ? ' [Halal]' : ''}${b.spicy ? ' [Spicy]' : ''}${b.vegetarian ? ' [Vegetarian]' : ''} [${getCategoryLabel(b.category, activeFilters.language)}] - ${b.signature}. ${b.desc}`
   ).join('\n');
   return prompt;
 }
@@ -648,6 +695,7 @@ function App() {
   const [anamStatus, setAnamStatus] = useState("Initializing...");
   const [filtered, setFiltered] = useState(false);
   const [recommendations, setRecommendations] = useState([]);
+  const [browseMode, setBrowseMode] = useState(true);
   const [rejectionNote, setRejectionNote] = useState(null);
   // ── Filter state (bidirectional sync with AI) ──
   const [activeFilters, setActiveFilters] = useState({ halal: "all", language: "en" });
@@ -685,6 +733,10 @@ function App() {
     return BRANDS.filter(b => {
       if (filters.halal === "halal" && !b.halal) return false;
       if (filters.halal === "non-halal" && b.halal) return false;
+      if (filters.spicy === true && !b.spicy) return false;
+      if (filters.spicy === false && b.spicy) return false;
+      if (filters.vegetarian === true && b.vegetarian !== true) return false;
+      if (filters.vegetarian === false && b.vegetarian === true) return false;
       return true;
     });
   }
@@ -737,6 +789,7 @@ IMPORTANT RULES:
 - Respond in the SAME LANGUAGE the user is speaking. If they speak English, reply in English. If they speak Chinese (中文), reply entirely in Chinese (简体中文).
 - Be friendly, warm, and conversational. Respond in 4-6 sentences.
 - Reply in plain text only. No markdown, asterisks, bold, italics, or bullet points.
+- Only recommend food at kopitiam outlet, if they ask anything else just say "Sorry, I’m only able to help with food recommendations for Kopitiam outlets, so I can’t answer this question."
 
 HALAL RULES:
 - Pork, lard, char siew, bak kut teh, bak chor mee, pig organ, roast pork, wanton (with pork), and alcohol are never halal.
@@ -772,7 +825,7 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
           personaId: 'kimberly-kiosk',
           name: 'Kimberly',
           avatarId: ANAM_AVATAR_ID,
-          voiceId: '48b9b50b-2542-4bc9-bf73-53e61e4534a5',
+          voiceId: '2ce35b4d-74b2-4419-9082-85ba7953e56a',
           llmId: 'a7cf662c-2ace-4de1-a21e-ef0fbf144bb7',
           systemPrompt: anamSystemPrompt,
         });
@@ -867,14 +920,14 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
             setSpeaking(false);
             setLoading(false);
             if (speakingTimeoutRef.current) { clearTimeout(speakingTimeoutRef.current); speakingTimeoutRef.current = null; }
-            // Auto-detect filters from user's spoken text
+            // Auto-detect traits from user's spoken text
             const userText = lastMsg?.content || '';
             const detected = parseFiltersFromText(userText);
-            if (detected.halal || detected.language) {
+            if (Object.keys(detected).length > 0) {
               const next = { ...activeFiltersRef.current, ...detected };
               setActiveFilters(next);
               activeFiltersRef.current = next;
-              console.log('[Filters] detected from speech:', JSON.stringify(detected));
+              console.log('[Traits] detected from speech:', JSON.stringify(detected), '→ active:', JSON.stringify(next));
             }
           } else if (lastRole === 'persona') {
             // Estimate speaking duration and auto-clear
@@ -886,7 +939,9 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
             speakingTimeoutRef.current = setTimeout(() => {
               setSpeaking(false);
               speakingTimeoutRef.current = null;
-            }, duration);
+            }, 1000);
+            // Switch from browse mode to AI recommendation view
+            setBrowseMode(false);
           }
         });
 
@@ -1067,17 +1122,21 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
       return;
     }
 
-    // ── Auto-detect filters from user voice ──
+    // ── Auto-detect filters / traits from user voice ──
     const detected = parseFiltersFromText(text);
     const currentFilters = activeFiltersRef.current;
     const newFilters = { ...currentFilters };
     let filtersChanged = false;
-    if (detected.halal) { newFilters.halal = detected.halal; filtersChanged = true; }
-    if (detected.language) { newFilters.language = detected.language; filtersChanged = true; }
+    for (const [key, value] of Object.entries(detected)) {
+      if (newFilters[key] !== value) {
+        newFilters[key] = value;
+        filtersChanged = true;
+      }
+    }
     if (filtersChanged) {
       setActiveFilters(newFilters);
       activeFiltersRef.current = newFilters;
-      console.log('[Filters] voice-detected:', JSON.stringify(newFilters));
+      console.log('[Traits] voice-detected:', JSON.stringify(detected), '→ active:', JSON.stringify(newFilters));
     }
 
     setRecommendations([]);
@@ -1091,8 +1150,14 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
       console.log('[PERF] Gemini:', ms(perf.geminiStart, perf.geminiEnd));
       const assistantMsg = { role: 'assistant', content: reply };
       setMessages(prev => [...prev, assistantMsg]);
-      // AI recommendations + filtered results
+      // AI recommendations — if AI picked specific stall(s), show ONLY those.
+      // Otherwise fall back to the full filtered browse list.
       const aiRecs = extractRecommendations(reply);
+      if (aiRecs.length > 0) {
+        setBrowseMode(false);
+      } else {
+        setBrowseMode(true);
+      }
       const filteredResults = getFilteredBrands(newFilters);
       // Merge: AI recs first, then filtered results that aren't already in AI recs
       const seen = new Set(aiRecs.map(b => b.stall));
@@ -1138,48 +1203,54 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
     return (
       <div style={{
         width: 2160, height: 3840, position: "relative", background: WHITE,
-        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+        display: "flex", flexDirection: "column",
         backgroundImage: "linear-gradient(0deg, rgba(232,232,232,0.82), rgba(232,232,232,0.82)), url(assets/background.png)",
         backgroundSize: "cover", backgroundPosition: "center",
       }}>
         {/* Logo */}
-        <img src="assets/kopitiam-logo.png" alt="Kopitiam" style={{ width: 800, marginBottom: 40 }} onError={(e) => { e.target.style.display = 'none'; }} />
-        <div style={{ fontSize: 64, fontWeight: 600, color: "#000", marginBottom: 40 }}>AI CONCIERGE</div>
-
-        {/* Language selection before starting */}
-        <div style={{ display: "flex", gap: 20, marginBottom: 40 }}>
-          <button onClick={() => {
-            const next = { ...activeFiltersRef.current, language: 'en' };
-            setActiveFilters(next);
-            activeFiltersRef.current = next;
-          }} style={{
-            padding: "20px 50px", fontSize: 36, fontWeight: 600,
-            border: `4px solid ${activeFilters.language === 'en' ? RED : "#ccc"}`,
-            background: activeFilters.language === 'en' ? RED : WHITE,
-            color: activeFilters.language === 'en' ? WHITE : DARK_TEXT,
-            borderRadius: 20, cursor: "pointer", transition: "all 0.2s",
-          }}>English</button>
-          <button onClick={() => {
-            const next = { ...activeFiltersRef.current, language: 'zh' };
-            setActiveFilters(next);
-            activeFiltersRef.current = next;
-          }} style={{
-            padding: "20px 50px", fontSize: 36, fontWeight: 600,
-            border: `4px solid ${activeFilters.language === 'zh' ? RED : "#ccc"}`,
-            background: activeFilters.language === 'zh' ? RED : WHITE,
-            color: activeFilters.language === 'zh' ? WHITE : DARK_TEXT,
-            borderRadius: 20, cursor: "pointer", transition: "all 0.2s",
-          }}>中文</button>
+        <div class="login-video-background" aria-hidden="true" style={{position: "absolute", width: 2160, height: 3840}}>
+          <video style={{width: 2160, height: 3840}} autoplay="autoplay" loop="loop" muted="muted" playsinline="true" preload="auto" class="login-video-element" webkit-playsinline="true" x-webkit-airplay="deny" disablepictureinpicture="true" disableremoteplayback="true" src="/assets/Kopitiam_v1.4.mp4"></video>
+          <div class="login-video-overlay"></div>
         </div>
+        <div style={{position: "relative", textAlign: "center", top: 1300, left: 600}}>
+          <button onClick={() => setStarted(true)} style={{
+            width: 400, height: 400, background: RED, color: WHITE,
+            border: "none", borderRadius: 400, fontSize: 48, fontWeight: 700,
+            cursor: "pointer", boxShadow: "0 4px 40px rgba(207,70,58,0.4)"
+          }}>
+            Talk to Me
+          </button>
+        </div>
+        <div style={{display: "none"}}>
+          <img src="assets/kopitiam-logo.png" alt="Kopitiam" style={{ width: 800, marginBottom: 40 }} onError={(e) => { e.target.style.display = 'none'; }} />
+          <div style={{ fontSize: 64, fontWeight: 600, color: "#000", marginBottom: 40 }}>AI CONCIERGE</div>
 
-        <button onClick={() => setStarted(true)} style={{
-          padding: "40px 100px", background: RED, color: WHITE,
-          border: "none", borderRadius: 30, fontSize: 48, fontWeight: 700,
-          cursor: "pointer", boxShadow: "0 4px 40px rgba(207,70,58,0.4)"
-        }}>
-          Start Conversation
-        </button>
-        <div style={{ color: "#888", fontSize: 32, marginTop: 30 }}>Tap to begin</div>
+          {/* Language selection before starting */}
+          <div style={{ display: "flex", gap: 20, marginBottom: 40 }}>
+            <button onClick={() => {
+              const next = { ...activeFiltersRef.current, language: 'en' };
+              setActiveFilters(next);
+              activeFiltersRef.current = next;
+            }} style={{
+              padding: "20px 50px", fontSize: 36, fontWeight: 600,
+              border: `4px solid ${activeFilters.language === 'en' ? RED : "#ccc"}`,
+              background: activeFilters.language === 'en' ? RED : WHITE,
+              color: activeFilters.language === 'en' ? WHITE : DARK_TEXT,
+              borderRadius: 20, cursor: "pointer", transition: "all 0.2s",
+            }}>English</button>
+            <button onClick={() => {
+              const next = { ...activeFiltersRef.current, language: 'zh' };
+              setActiveFilters(next);
+              activeFiltersRef.current = next;
+            }} style={{
+              padding: "20px 50px", fontSize: 36, fontWeight: 600,
+              border: `4px solid ${activeFilters.language === 'zh' ? RED : "#ccc"}`,
+              background: activeFilters.language === 'zh' ? RED : WHITE,
+              color: activeFilters.language === 'zh' ? WHITE : DARK_TEXT,
+              borderRadius: 20, cursor: "pointer", transition: "all 0.2s",
+            }}>中文</button>
+          </div>
+        </div>
       </div>
     );
   }
@@ -1190,22 +1261,6 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
       width: 2160, height: 3840, position: "relative", backgroundColor: WHITE, overflow: "hidden",
       backgroundImage: "linear-gradient(0deg, rgba(232,232,232,0.82), rgba(232,232,232,0.82)), url(assets/background.png)",
     }}>
-      {/* Debug panel */}
-      <div style={{
-        position: "fixed", top: 10, right: 10, zIndex: 9999,
-        background: "rgba(0,0,0,0.85)", color: "#0f0", padding: "16px 24px",
-        borderRadius: 12, fontSize: 22, fontFamily: "monospace",
-        maxWidth: 500, lineHeight: "28px",
-      }}>
-        <div><strong>DEBUG</strong></div>
-        <div>anamConnected: {String(anamConnected)}</div>
-        <div>videoReady: {String(videoReady)}</div>
-        <div>loading: {String(loading)}</div>
-        <div>speaking: {String(speaking)}</div>
-        <div>speakLock: {String(speakLockRef.current)}</div>
-        <div>status: {anamStatus}</div>
-        <div>messages: {messages.length}</div>
-      </div>
 
       {/* ── Header: Logo + AI CONCIERGE ── */}
       <div style={{ position: "absolute", top: 0, left: 0, width: 2160, textAlign: "center" }}>
@@ -1455,7 +1510,7 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
 
       {/* ── Filter Bar ── */}
       <div style={{
-        position: "absolute", left: 400, top: 370, width: 750,
+        position: "absolute", left: 400, top: 370, width: 1400,
         padding: "0",
         display: "flex", flexDirection: "column", gap: 12,
       }}>
@@ -1472,6 +1527,7 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
               const next = { ...activeFiltersRef.current, halal: opt.key };
               setActiveFilters(next);
               activeFiltersRef.current = next;
+              setBrowseMode(true);
               // Refresh displayed stalls immediately
               const filtered = getFilteredBrands(next);
               const aiRecs = recommendations.filter(r => {
@@ -1488,51 +1544,52 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
             }}>{opt.label}</button>
           ))}
 
-          {/* Language toggle */}
-          <div style={{ display: "flex", gap: 0, borderRadius: 30, overflow: "hidden", border: `3px solid ${RED}` }}>
-            <button onClick={() => {
-              const prevLang = activeFiltersRef.current.language;
-              const next = { ...activeFiltersRef.current, language: 'en' };
-              setActiveFilters(next);
-              activeFiltersRef.current = next;
-              const now = Date.now();
-              if (prevLang !== 'en' && now - lastLangSwitchRef.current > 3000) {
-                lastLangSwitchRef.current = now;
-                const greeting = ENGLISH_GREETING;
-                if (anamClientRef.current && anamConnectedRef.current) {
-                  speakLockRef.current = false;
-                  try { anamClientRef.current.stopSpeaking(); } catch(e) {}
-                  setTimeout(() => speakWithAnam(greeting), 300);
-                }
+          {/* Language toggle - same styling as halal filters */}
+          <span style={{ fontSize: 24, color: "#999", fontWeight: 500 }}>|</span>
+          <button onClick={() => {
+            const prevLang = activeFiltersRef.current.language;
+            const next = { ...activeFiltersRef.current, language: 'en' };
+            setActiveFilters(next);
+            activeFiltersRef.current = next;
+            const now = Date.now();
+            if (prevLang !== 'en' && now - lastLangSwitchRef.current > 3000) {
+              lastLangSwitchRef.current = now;
+              const greeting = ENGLISH_GREETING;
+              if (anamClientRef.current && anamConnectedRef.current) {
+                speakLockRef.current = false;
+                try { anamClientRef.current.stopSpeaking(); } catch(e) {}
+                setTimeout(() => speakWithAnam(greeting), 300);
               }
-            }} style={{
-              padding: "12px 28px", fontSize: 28, fontWeight: 600,
-              background: activeFilters.language === 'en' ? RED : WHITE,
-              color: activeFilters.language === 'en' ? WHITE : DARK_TEXT,
-              border: "none", cursor: "pointer",
-            }}>English</button>
-            <button onClick={() => {
-              const prevLang = activeFiltersRef.current.language;
-              const next = { ...activeFiltersRef.current, language: 'zh' };
-              setActiveFilters(next);
-              activeFiltersRef.current = next;
-              const now = Date.now();
-              if (prevLang !== 'zh' && now - lastLangSwitchRef.current > 3000) {
-                lastLangSwitchRef.current = now;
-                const greeting = CHINESE_GREETING;
-                if (anamClientRef.current && anamConnectedRef.current) {
-                  speakLockRef.current = false;
-                  try { anamClientRef.current.stopSpeaking(); } catch(e) {}
-                  setTimeout(() => speakWithAnam(greeting), 300);
-                }
+            }
+          }} style={{
+            padding: "12px 28px", borderRadius: 30, fontSize: 28, fontWeight: 600,
+            border: `3px solid ${activeFilters.language === 'en' ? RED : "#ccc"}`,
+            background: activeFilters.language === 'en' ? RED : WHITE,
+            color: activeFilters.language === 'en' ? WHITE : DARK_TEXT,
+            cursor: "pointer", transition: "all 0.2s", whiteSpace: "nowrap",
+          }}>English</button>
+          <button onClick={() => {
+            const prevLang = activeFiltersRef.current.language;
+            const next = { ...activeFiltersRef.current, language: 'zh' };
+            setActiveFilters(next);
+            activeFiltersRef.current = next;
+            const now = Date.now();
+            if (prevLang !== 'zh' && now - lastLangSwitchRef.current > 3000) {
+              lastLangSwitchRef.current = now;
+              const greeting = CHINESE_GREETING;
+              if (anamClientRef.current && anamConnectedRef.current) {
+                speakLockRef.current = false;
+                try { anamClientRef.current.stopSpeaking(); } catch(e) {}
+                setTimeout(() => speakWithAnam(greeting), 300);
               }
-            }} style={{
-              padding: "12px 28px", fontSize: 28, fontWeight: 600,
-              background: activeFilters.language === 'zh' ? RED : WHITE,
-              color: activeFilters.language === 'zh' ? WHITE : DARK_TEXT,
-              border: "none", borderLeft: `3px solid ${RED}`, cursor: "pointer",
-            }}>中文</button>
-          </div>
+            }
+          }} style={{
+            padding: "12px 28px", borderRadius: 30, fontSize: 28, fontWeight: 600,
+            border: `3px solid ${activeFilters.language === 'zh' ? RED : "#ccc"}`,
+            background: activeFilters.language === 'zh' ? RED : WHITE,
+            color: activeFilters.language === 'zh' ? WHITE : DARK_TEXT,
+            cursor: "pointer", transition: "all 0.2s", whiteSpace: "nowrap",
+          }}>中文</button>
 
           {/* Reset filters */}
           {(activeFilters.halal !== "all" || activeFilters.language !== "en") && (
@@ -1540,6 +1597,7 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
               const next = { halal: "all", language: "en" };
               setActiveFilters(next);
               activeFiltersRef.current = next;
+              setBrowseMode(true);
               const filtered = getFilteredBrands(next);
               setRecommendations(filtered);
             }} style={{
@@ -1552,7 +1610,18 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
       </div>
 
       {/* ── Kimberly's Recommendation ── */}
-      {recommendations.length > 0 && (
+      {(() => {
+        let aiRecs = [];
+        for (let i = messages.length - 1; i >= 0; i--) {
+          if (messages[i].role === 'assistant') {
+            const recs = extractRecommendations(messages[i].content);
+            if (recs.length > 0) { aiRecs = recs; break; }
+          }
+        }
+        const displayRecs = (!browseMode && aiRecs.length > 0) ? aiRecs : recommendations;
+        const isAiMode = (!browseMode && aiRecs.length > 0);
+        if (displayRecs.length === 0) return null;
+        return (
         <div style={{
           position: "absolute", left: 0, top: 2150, width: 2160,
           padding: "0 80px",
@@ -1565,19 +1634,15 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
             display: "flex", gap: 30, overflowX: "auto",
             paddingBottom: 20,
           }}>
-            {recommendations.map((brand, i) => {
-              const lastAssistantMsg = messages.filter(m => m.role === 'assistant').pop();
-              const aiStalls = lastAssistantMsg ? extractRecommendations(lastAssistantMsg.content).map(b => b.stall) : [];
-              const isAiPick = aiStalls.includes(brand.stall);
-              return (
+            {displayRecs.map((brand, i) => (
                 <div key={i} style={{
                   minWidth: 580, background: WHITE,
                   borderRadius: 30, padding: "32px 36px 40px",
                   boxShadow: "0 4px 30px rgba(0,0,0,0.1)",
-                  border: `4px solid ${isAiPick ? GOLD : "#e0e0e0"}`,
+                  border: `4px solid ${isAiMode ? GOLD : "#e0e0e0"}`,
                   flexShrink: 0,
                 }}>
-                  {isAiPick && (
+                  {isAiMode && (
                     <div style={{
                       display: "inline-block",
                       background: GOLD, color: DARK_TEXT,
@@ -1613,11 +1678,11 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
                     fontSize: 28, color: "#888", lineHeight: "38px",
                   }}>{brand.desc}</div>
                 </div>
-              );
-            })}
+            ))}
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* ── Bottom Sponsor Bar ── */}
       <div style={{
@@ -1634,6 +1699,7 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
       {/* ── Restart Conversation Button (bottom left) ── */}
       <button disabled={messages.length === 0 || speaking || loading} onClick={() => {
         setMessages([]);
+        setBrowseMode(true);
         setRecommendations([]);
         setFiltered(false);
         setLoading(false);
