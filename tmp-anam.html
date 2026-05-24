@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=2160, initial-scale=1.0">
+<title>Ask Kimberly - Chat with me (UI Preview)</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #000;
+  overflow: hidden;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#root {
+  width: 2160px;
+  height: 3840px;
+  transform-origin: top left;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+function scaleKiosk() {
+  var root = document.getElementById('root');
+  var scaleX = window.innerWidth / 2160;
+  var scaleY = window.innerHeight / 3840;
+  var scale = Math.min(scaleX, scaleY);
+  root.style.transform = 'scale(' + scale + ')';
+  root.style.left = ((window.innerWidth - 2160 * scale) / 2) + 'px';
+  root.style.top = ((window.innerHeight - 3840 * scale) / 2) + 'px';
+}
+scaleKiosk();
+window.addEventListener('resize', scaleKiosk);
+
+const RED = "#CF463A";
+const GOLD = "#F5B150";
+const DARK_TEXT = "#324157";
+const WHITE = "#FFFFFF";
+
+const ICONS = {
+  home: `<svg width="96" height="96" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>`,
+  seats: `<svg width="96" height="96" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>`,
+  stores: `<svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>`,
+  food: `<svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z"/></svg>`,
+  chat: `<svg width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/></svg>`,
+  mic: `<svg width="127" height="123" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>`,
+};
+
+const BRANDS = [
+  { stall: 1, brand: "Kopi Kiosk", cuisine: "Drinks & Desserts", halal: false, signature: "Kopitiam Signature Breakfast Set" },
+  { stall: 2, brand: "Bread Junction", cuisine: "Bread & Bakery", halal: true, signature: "Fresh Bread" },
+  { stall: 3, brand: "Kallang Airport Wanton Mee", cuisine: "Wanton Noodle", halal: false, signature: "Wanton Noodle" },
+  { stall: 4, brand: "Teochew Pig Organ Soup", cuisine: "Teochew Cuisine", halal: false, signature: "Salted Vegetable Pig's Organ Soup" },
+  { stall: 5, brand: "Yuan Wei Su Yu", cuisine: "Vegetarian", halal: false, signature: "Vegetarian Set Meal" },
+  { stall: 14, brand: "Cinta Hainanese Chicken Rice", cuisine: "Chicken Rice", halal: true, signature: "Hainanese Chicken Rice" },
+  { stall: 15, brand: "Monster Chili Mala Hot Pot", cuisine: "Mala Hotpot", halal: true, signature: "Mala Hot Pot" },
+  { stall: 16, brand: "Beradik Western", cuisine: "Western Food", halal: true, signature: "Fish & Chips" },
+  { stall: 19, brand: "Majulah Nasi Padang", cuisine: "Nasi Padang", halal: true, signature: "Nasi Lemak Beef Rendang" },
+  { stall: 20, brand: "Y&H Ayam Penyet", cuisine: "Indonesian", halal: true, signature: "Ayam Penyet" },
+];
+
+let activeFilters = { halal: "all", language: "en" };
+
+function NavButton(icon, label, active) {
+  return `<div style="
+    width: 267px; height: 257px;
+    background: ${active ? RED : "rgba(254, 254, 254, 0.8)"};
+    border: ${active ? `5px solid ${GOLD}` : "5px solid #B0B0B0"};
+    box-shadow: ${active ? `0px 4px 40px ${GOLD}` : "0px 4px 40px rgba(0, 0, 0, 0.25)"};
+    border-radius: 50px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 12px; cursor: pointer; flex-shrink: 0;
+  ">
+    <div style="color: ${active ? WHITE : DARK_TEXT}">${icon}</div>
+    <span style="font-weight: 600; font-size: 40px; line-height: 48px; color: ${active ? WHITE : DARK_TEXT}; text-align: center;">${label}</span>
+  </div>`;
+}
+
+function FilterButton(key, label, active, onClick) {
+  return `<button onclick="${onClick}" style="
+    padding: 12px 28px; border-radius: 30px; font-size: 28px; font-weight: 600;
+    border: 3px solid ${active ? RED : "#ccc"};
+    background: ${active ? RED : WHITE};
+    color: ${active ? WHITE : DARK_TEXT};
+    cursor: pointer; transition: all 0.2s; white-space: nowrap;
+  ">${label}</button>`;
+}
+
+function setFilterHalal(key) {
+  activeFilters.halal = key;
+  render();
+}
+function setFilterLang(lang) {
+  activeFilters.language = lang;
+  render();
+}
+
+function ChatMessage(role, content) {
+  const isUser = role === 'user';
+  const name = isUser ? 'You' : 'Kimberly';
+  const nameColor = isUser ? '#555' : RED;
+  const align = isUser ? 'flex-end' : 'flex-start';
+  const margin = isUser ? 'margin-right: 8px;' : 'margin-left: 8px;';
+  const bubbleBg = isUser ? RED : 'rgba(245, 177, 80, 0.6)';
+  const bubbleRadius = isUser ? '20px 20px 4px 20px' : '20px 20px 20px 4px';
+  const textColor = isUser ? WHITE : '#000';
+  return `
+    <div style="display: flex; flex-direction: column; align-items: ${align};">
+      <div style="font-weight: 600; font-size: 30px; color: ${nameColor}; margin-bottom: 8px; ${margin}">${name}</div>
+      <div style="
+        background: ${bubbleBg}; border-radius: ${bubbleRadius};
+        padding: 24px 32px; max-width: 70%;
+        font-size: 32px; line-height: 42px; color: ${textColor};
+      ">${content}</div>
+    </div>`;
+}
+
+function StallCard(brand, isAi) {
+  return `<div style="
+    min-width: 580px; background: ${WHITE};
+    border-radius: 30px; padding: 32px 36px 40px;
+    box-shadow: 0 4px 30px rgba(0,0,0,0.1);
+    border: 4px solid ${isAi ? GOLD : '#e0e0e0'};
+    flex-shrink: 0;
+  ">
+    ${isAi ? `<div style="font-size: 24px; font-weight: 600; color: ${GOLD}; margin-bottom: 10px;">Recommended</div>` : ''}
+    <div style="font-size: 36px; font-weight: 700; color: ${DARK_TEXT}; margin-bottom: 8px;">${brand.brand}</div>
+    <div style="font-size: 26px; color: #666; margin-bottom: 12px;">Stall ${brand.stall} &middot; ${brand.cuisine}${brand.halal ? ' [Halal]' : ''}</div>
+    <div style="font-size: 28px; color: #333; font-weight: 500;">${brand.signature}</div>
+  </div>`;
+}
+
+function render() {
+  const filtered = activeFilters.halal !== "all" || activeFilters.language !== "en";
+  const recs = BRANDS.filter(b => {
+    if (activeFilters.halal === "halal" && !b.halal) return false;
+    if (activeFilters.halal === "non-halal" && b.halal) return false;
+    return true;
+  });
+
+  const halalOptions = [
+    { key: "all", label: activeFilters.language === 'zh' ? '全部' : 'All' },
+    { key: "halal", label: activeFilters.language === 'zh' ? '清真' : 'Halal' },
+    { key: "non-halal", label: activeFilters.language === 'zh' ? '非清真' : 'Non-Halal' },
+  ];
+
+  const halalButtons = halalOptions.map(opt =>
+    FilterButton(opt.key, opt.label, activeFilters.halal === opt.key, `setFilterHalal('${opt.key}')`)
+  ).join('');
+
+  const langToggle = `
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <span style="font-size: 24px; color: #999; font-weight: 500;">|</span>
+      ${FilterButton('en', 'English', activeFilters.language === 'en', `setFilterLang('en')`)}
+      ${FilterButton('zh', '中文', activeFilters.language === 'zh', `setFilterLang('zh')`)}
+    </div>`;
+
+  const resetButton = filtered ? `
+    <button onclick="activeFilters={halal:'all',language:'en'};render();" style="
+      padding: 12px 28px; border-radius: 30px; font-size: 28px; font-weight: 600;
+      border: 3px solid #888; background: #f5f5f5; color: #666; cursor: pointer; white-space: nowrap;
+    ">${activeFilters.language === 'zh' ? '重置' : 'Reset'}</button>` : '';
+
+  const greeting = activeFilters.language === 'zh'
+    ? '你好！我是Kimberly，Kopitiam的AI礼宾。很高兴为你推荐今天的美食！你想吃点什么呢？'
+    : "Hello! I'm Kimberly, your AI concierge at Kopitiam. I'd love to help you find something delicious today! What are you in the mood for?";
+
+  const stallsHtml = recs.map(b => StallCard(b, false)).join('');
+
+  const root = document.getElementById('root');
+  root.innerHTML = `
+    <div style="width: 2160px; min-height: 3840px; background-color: ${WHITE};
+      background-image: linear-gradient(0deg, rgba(232,232,232,0.82), rgba(232,232,232,0.82)), url(assets/background.png);
+      background-size: cover; background-position: center;
+      display: flex; flex-direction: column;
+    ">
+      <!-- Header -->
+      <div style="text-align: center; padding-top: 91px; padding-bottom: 20px;">
+        <div style="font-weight: 500; font-size: 40px; line-height: 48px; letter-spacing: 0.2em; color: #000;">WELCOME TO</div>
+        <div style="font-size: 120px; font-weight: 800; color: ${RED}; font-style: italic; margin: 20px 0;">KOPITIAM</div>
+        <div style="font-weight: 500; font-size: 40px; line-height: 48px; letter-spacing: 0.2em; color: #000; margin-top: 10px;">AI CONCIERGE</div>
+      </div>
+
+      <!-- Main Content Row -->
+      <div style="display: flex; flex-direction: row; padding: 40px 59px; gap: 40px; flex: 1;">
+
+        <!-- Left Column: Nav + Filters + Chat -->
+        <div style="display: flex; flex-direction: column; gap: 30px;">
+
+          <!-- Nav Buttons -->
+          <div style="display: flex; flex-direction: column; gap: 29px;">
+            ${NavButton(ICONS.home, "Home", false)}
+            ${NavButton(ICONS.seats, "Seats", false)}
+            ${NavButton(ICONS.stores, "Stores", false)}
+            ${NavButton(ICONS.food, "Food", false)}
+            ${NavButton(ICONS.chat, "Chat with<br/>me", true)}
+          </div>
+
+        </div>
+
+        <!-- Middle Column: Filters + Chat -->
+        <div style="display: flex; flex-direction: column; gap: 24px; width: 750px;">
+
+          <!-- Filter Bar -->
+          <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
+            <span style="font-size: 32px; font-weight: 600; color: ${DARK_TEXT};">${activeFilters.language === 'zh' ? '筛选:' : 'Filters:'}</span>
+            ${halalButtons}
+            ${resetButton}
+          </div>
+
+          <!-- Chat Area -->
+          <div style="
+            flex: 1; min-height: 900px; max-height: 1100px;
+            display: flex; flex-direction: column;
+            background: rgba(255,255,255,0.85); border-radius: 30px;
+            border: 10px solid #e0e0e0;
+            padding: 20px; overflow: hidden;
+          ">
+            <div style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 24px;">
+              ${ChatMessage('assistant', greeting)}
+              ${ChatMessage('user', 'What do you recommend for lunch?')}
+              ${ChatMessage('assistant', "I'd recommend Stall 14 — Cinta Hainanese Chicken Rice! Their Hainanese Chicken Rice is a classic favourite. The chicken is tender, the rice fragrant, and the chilli sauce is the perfect complement. It's also halal-certified!")}
+            </div>
+          </div>
+
+          <!-- Voice Status -->
+          <div style="display: flex; align-items: center; justify-content: center; padding: 20px 0;">
+            <div style="display: flex; align-items: center; gap: 20px; padding: 24px 48px; border-radius: 60px; background: ${WHITE}; box-shadow: 0 4px 30px rgba(0,0,0,0.1);">
+              <div style="width: 140px; height: 140px; border-radius: 50%; background: ${RED}; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0;">
+                <div style="color: ${WHITE};">${ICONS.mic}</div>
+              </div>
+              <div>
+                <div style="font-size: 40px; font-weight: 700; color: ${RED};">Tap to speak</div>
+                <div style="font-size: 28px; color: #888; margin-top: 4px;">Or type your message below</div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Right Column: Language + Avatar -->
+        <div style="display: flex; flex-direction: column; align-items: flex-end; justify-content: flex-start; flex: 1; gap: 30px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 32px; font-weight: 600; color: ${DARK_TEXT};">${activeFilters.language === 'zh' ? '语言:' : 'Language:'}</span>
+            ${FilterButton('en', 'English', activeFilters.language === 'en', `setFilterLang('en')`)}
+            ${FilterButton('zh', '中文', activeFilters.language === 'zh', `setFilterLang('zh')`)}
+          </div>
+          <div style="width: 900px; height: 900px; border-radius: 50%; border: 6px solid ${GOLD}; box-shadow: 0 8px 40px rgba(0,0,0,0.15); overflow: hidden; flex-shrink: 0;">
+            <div style="width: 100%; height: 100%; background: linear-gradient(180deg, #f4e6d0 0%, #e8d4b0 100%); display: flex; align-items: center; justify-content: center;">
+              <svg width="320" height="320" viewBox="0 0 200 200" style="opacity: 0.35">
+                <circle cx="100" cy="75" r="38" fill="${RED}" />
+                <path d="M 30 200 Q 30 115 100 115 Q 170 115 170 200 Z" fill="${RED}" />
+              </svg>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Food Stalls Section -->
+      <div style="padding: 40px 80px;">
+        <div style="font-weight: 600; font-size: 48px; color: ${RED}; margin-bottom: 30px;">${activeFilters.language === 'zh' ? '美食摊位' : 'Food Stalls'}</div>
+        <div style="display: flex; gap: 30px; overflow-x: auto; padding-bottom: 20px;">
+          ${stallsHtml}
+        </div>
+      </div>
+
+      <!-- Bottom Bar -->
+      <div style="padding: 40px 80px; display: flex; align-items: center; justify-content: space-between; background: linear-gradient(0deg, rgba(255,255,255,0.95), transparent); margin-top: auto;">
+        <div style="font-size: 28px; color: #888;">Powered by AI Concierge</div>
+        <div style="display: flex; gap: 20px;">
+          <div style="width: 80px; height: 80px; border-radius: 50%; background: ${RED}; display: flex; align-items: center; justify-content: center;">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+render();
+</script>
+</body>
+</html>
