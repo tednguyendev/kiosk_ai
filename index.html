@@ -8,7 +8,7 @@
 window.__CONFIG = {
   ANAM_API_KEY: 'YTYwNjJjMDAtNGIxMC00ODU0LTgyYjAtOGU3YzE5ZTdmNTBmOkVSSVFZS0pjOG4wa05rSGRoT2pHLzhRZ3Y5RzNielBzN3ZsZEdaSGJqM0U9',
   ANAM_AVATAR_ID: '7c4129d7-76ec-47da-bd44-3c92feea24fa',
-  GEMINI_API_KEY: 'AIzaSyAHCe88d2e8jrApLX9KKyaKEyU-ZJx9a54',
+  GEMINI_API_KEY: 'AIzaSyCKHxd52gn7_rO4dLse0Hj3uAXnhscZ7QA',
   GEMINI_MODEL: 'gemini-2.5-flash',
   OPENAI_API_KEY: ''
 };
@@ -714,6 +714,8 @@ function App() {
   const idleTimeoutRef = useRef(null);
   // Mirror anamConnected into a ref so sendToAgent doesn't read a stale value from its closure
   const anamConnectedRef = useRef(false);
+  // Track when sendToAgent is processing so Anam listeners can skip conflicting persona messages
+  const loadingRef = useRef(false);
 
   const ANAM_API_KEY = window.__CONFIG?.ANAM_API_KEY;
   const ANAM_AVATAR_ID = window.__CONFIG?.ANAM_AVATAR_ID;
@@ -839,6 +841,9 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
             const role = (evt.role || '').toLowerCase() === 'persona' ? 'assistant' : 'user';
             const chunk = evt.content;
 
+            // Skip Anam assistant chunks while Gemini is generating our response
+            if (role === 'assistant' && loadingRef.current) return;
+
             setMessages(prev => {
               // Skip chunks already covered by a stable message (prevents duplicate greeting/reply)
               const existingStable = prev.find(m => m.role === role && !m._streaming && m.content.trim().includes(chunk.trim()));
@@ -873,12 +878,14 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
           console.log('[Anam] Raw messages:', JSON.stringify(messages.slice(-2)));
 
           // Convert Anam messages to our format — Anam uses role: 'persona' (assistant) | 'user'
+          // Skip interrupted messages (partial native LLM responses that were cut off)
           const formatted = messages.map(m => {
+            if (m.interrupted === true) return null;
             const rawRole = (m.role || '').toLowerCase();
             const role = rawRole === 'persona' || rawRole === 'assistant' ? 'assistant' : 'user';
             const content = m.content || m.text || (m.parts && m.parts[0] && m.parts[0].text) || '';
             return { role, content };
-          }).filter(m => m.content.trim());
+          }).filter(m => m && m.content.trim());
 
           // Deduplicate within formatted (preserve order)
           const seenFormatted = new Set();
@@ -889,22 +896,35 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
             return true;
           });
 
-          // Merge with existing messages: streaming placeholders are replaced by history (source of truth)
+          // Merge with existing messages, keeping longer content when a streaming msg exists
           setMessages(prev => {
             const expectedGreeting = activeFiltersRef.current.language === 'zh' ? CHINESE_GREETING : ENGLISH_GREETING;
             const hasFullGreeting = prev.some(m => m.role === 'assistant' && m.content.trim() === expectedGreeting);
 
             // Filter out truncated greetings if we already have the full greeting
-            const cleanHistory = hasFullGreeting
+            let cleanHistory = hasFullGreeting
               ? dedupedFormatted.filter(m => !(m.role === 'assistant' && expectedGreeting.includes(m.content.trim()) && m.content.trim().length < expectedGreeting.length))
               : dedupedFormatted;
 
+            // If Gemini is generating our response, skip Anam persona messages entirely
+            if (loadingRef.current) {
+              cleanHistory = cleanHistory.filter(m => m.role !== 'assistant');
+            }
+
+            // Merge: for each history message, if a longer streaming counterpart exists, keep the longer one
+            const mergedHistory = cleanHistory.map(h => {
+              const streamingMatch = prev.find(m => m._streaming && m.role === h.role);
+              if (streamingMatch && streamingMatch.content.length > h.content.length) {
+                return { ...h, content: streamingMatch.content };
+              }
+              return h;
+            });
+
             // Only discard streaming placeholders if history actually has content to replace them.
-            // This prevents losing text if a history update arrives empty or incomplete.
-            const stablePrev = cleanHistory.length > 0 ? prev.filter(m => !m._streaming) : prev;
+            const stablePrev = mergedHistory.length > 0 ? prev.filter(m => !m._streaming) : prev;
             const prevMap = new Map(stablePrev.map((m, i) => [m.content.trim(), i]));
 
-            const newMsgs = cleanHistory.filter(m => !prevMap.has(m.content.trim()));
+            const newMsgs = mergedHistory.filter(m => !prevMap.has(m.content.trim()));
             if (newMsgs.length === 0) return stablePrev;
             return [...stablePrev, ...newMsgs];
           });
@@ -920,6 +940,8 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
             setSpeaking(false);
             setLoading(false);
             if (speakingTimeoutRef.current) { clearTimeout(speakingTimeoutRef.current); speakingTimeoutRef.current = null; }
+            // Stop Anam's native LLM immediately before it starts speaking
+            try { client.interruptPersona(); } catch(e) {}
             // Auto-detect traits from user's spoken text
             const userText = lastMsg?.content || '';
             const detected = parseFiltersFromText(userText);
@@ -929,7 +951,13 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
               activeFiltersRef.current = next;
               console.log('[Traits] detected from speech:', JSON.stringify(detected), '→ active:', JSON.stringify(next));
             }
+            // Hand off to Gemini for the actual response (traits stack + recommendations work)
+            if (sendToAgentRef.current && userText.trim()) {
+              setTimeout(() => sendToAgentRef.current(userText), 50);
+            }
           } else if (lastRole === 'persona') {
+            // Skip Anam persona state updates when Gemini is handling the response
+            if (loadingRef.current) return;
             // Estimate speaking duration and auto-clear
             const content = lastMsg?.content || '';
             const duration = Math.max(3000, content.length * 120);
@@ -1023,18 +1051,15 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
   // ─── Anam speak: send text to avatar via talk() ───
   async function speakWithAnam(text) {
     if (!anamClientRef.current) return;
-    if (speakLockRef.current) { console.log('[Anam] speak locked, skipping:', text.slice(0, 40)); return; }
-    speakLockRef.current = true;
     console.log('[Anam] speakWithAnam called:', text.slice(0, 60));
     setSpeaking(true);
     try {
+      // Stop any ongoing Anam speech/response before speaking our Gemini reply
+      try { anamClientRef.current.interruptPersona(); } catch(e) {}
       await anamClientRef.current.talk(text);
       console.log('[Anam] talk() sent successfully');
-      const duration = Math.max(2000, text.length * 150);
-      setTimeout(() => { setSpeaking(false); speakLockRef.current = false; }, duration);
     } catch (err) {
       console.error('[Anam] talk error:', err);
-      speakLockRef.current = false;
       setSpeaking(false);
     }
   }
@@ -1112,13 +1137,19 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
 
   async function sendToAgent(text) {
     if (!text.trim()) return;
+    loadingRef.current = true;
     const check = filterMessage(text);
     const userMsg = { role: 'user', content: text };
-    setMessages(prev => [...prev, userMsg]);
+    // Only add user message if not already present (Anam listener may have added it)
+    setMessages(prev => {
+      if (prev.some(m => m.role === 'user' && m.content.trim() === text.trim())) return prev;
+      return [...prev, userMsg];
+    });
     setFiltered(false);
     if (!check.allowed) {
       setMessages(prev => [...prev, { role: 'assistant', content: check.reason, filtered: true }]);
       setFiltered(true);
+      loadingRef.current = false;
       return;
     }
 
@@ -1149,7 +1180,11 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
       perf.geminiEnd = performance.now();
       console.log('[PERF] Gemini:', ms(perf.geminiStart, perf.geminiEnd));
       const assistantMsg = { role: 'assistant', content: reply };
-      setMessages(prev => [...prev, assistantMsg]);
+      // Only add assistant message if not already present
+      setMessages(prev => {
+        if (prev.some(m => m.role === 'assistant' && m.content.trim() === reply.trim())) return prev;
+        return [...prev, assistantMsg];
+      });
       // AI recommendations — if AI picked specific stall(s), show ONLY those.
       // Otherwise fall back to the full filtered browse list.
       const aiRecs = extractRecommendations(reply);
@@ -1165,16 +1200,19 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
       setRecommendations(merged);
       if (anamClientRef.current && anamConnectedRef.current) {
         setLoading(false);
+        loadingRef.current = false;
         perf.speakCall = performance.now();
         speakWithAnam(reply);
       } else {
         console.log('[App] reply queued — waiting for Anam to connect');
         pendingSpeakRef.current = reply;
+        loadingRef.current = false;
       }
     } catch (err) {
       console.error("Gemini error:", err);
       setMessages(prev => [...prev, { role: 'assistant', content: "Error: " + (err.message || err) }]);
       setLoading(false);
+      loadingRef.current = false;
     }
   }
 
