@@ -11,7 +11,7 @@ window.__CONFIG = {
   LIVEAVATAR_VOICE_ID: 'de5574fc-009e-4a01-a881-9919ef8f5a0c', // Ann - IA
   LIVEAVATAR_CONTEXT_ID: 'e047f19d-9f27-49e4-b4e6-f8bb28c0ef94',
   GEMINI_API_KEY: 'AIzaSyDs7HcruQh5GIZyH9PA1VeNiEEobp4_L-o',
-  GEMINI_MODEL: 'gemini-2.5-flash',
+  GEMINI_MODEL: 'gemini-1.5-flash',
   OPENAI_API_KEY: ''
 };
 
@@ -670,7 +670,7 @@ Here is the stall directory:\n` + BRANDS.map(b =>
   `Stall ${b.stall}: ${b.brand} (${b.cuisine})${b.halal ? ' [Halal]' : ''} - ${b.signature}. ${b.desc}`
 ).join('\n');
 
-async function callGemini(conversationHistory, activeFilters = { halal: 'all', language: 'en' }) {
+async function callGemini(conversationHistory, activeFilters = { halal: 'all', language: 'en' }, attempt = 1) {
   const GEMINI_API_KEY = window.__CONFIG.GEMINI_API_KEY;
   const GEMINI_MODEL = window.__CONFIG.GEMINI_MODEL;
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
@@ -689,7 +689,16 @@ async function callGemini(conversationHistory, activeFilters = { halal: 'all', l
     })
   });
 
-  if (!res.ok) throw new Error(`Gemini API error: ${res.status}`);
+  if (!res.ok) {
+    // Retry on rate-limit (429) or occasional 403, up to 3 times with backoff
+    if ((res.status === 429 || res.status === 403) && attempt < 3) {
+      const delay = attempt * 800;
+      console.log(`[Gemini] ${res.status} — retrying in ${delay}ms (attempt ${attempt + 1}/3)`);
+      await new Promise(r => setTimeout(r, delay));
+      return callGemini(conversationHistory, activeFilters, attempt + 1);
+    }
+    throw new Error(`Gemini API error: ${res.status}`);
+  }
   const data = await res.json();
   const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || 'Sorry, I could not generate a response.';
   return raw
