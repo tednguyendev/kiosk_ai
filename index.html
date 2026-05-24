@@ -847,7 +847,7 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
             setMessages(prev => {
               // Skip chunks already covered by a stable message (prevents duplicate greeting/reply)
               const existingStable = prev.find(m => m.role === role && !m._streaming && m.content.trim().includes(chunk.trim()));
-              if (existingStable && role === 'assistant') {
+              if (existingStable) {
                 return prev;
               }
               // Accumulate into the last message if it's a streaming message of the same role.
@@ -958,6 +958,8 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
           } else if (lastRole === 'persona') {
             // Skip Anam persona state updates when Gemini is handling the response
             if (loadingRef.current) return;
+            // Turn complete — allow user to repeat the same phrase in a new turn
+            lastUserTextRef.current = '';
             // Estimate speaking duration and auto-clear
             const content = lastMsg?.content || '';
             const duration = Math.max(3000, content.length * 120);
@@ -1135,8 +1137,14 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
     };
   }, [started, messages.length, speaking, loading]);
 
+  const lastUserTextRef = useRef('');
+
   async function sendToAgent(text) {
     if (!text.trim()) return;
+    const trimmed = text.trim();
+    // Ref-based dedup: bail if we already processed this exact user text
+    if (lastUserTextRef.current === trimmed) return;
+    lastUserTextRef.current = trimmed;
     loadingRef.current = true;
     const check = filterMessage(text);
     const userMsg = { role: 'user', content: text };
@@ -1737,6 +1745,7 @@ Stall 21: Ampang YTF & Tangkak Beef Noodle (Yong Tau Foo & Beef Noodle) [Halal] 
       {/* ── Restart Conversation Button (bottom left) ── */}
       <button disabled={messages.length === 0 || speaking || loading} onClick={() => {
         setMessages([]);
+        lastUserTextRef.current = '';
         setBrowseMode(true);
         setRecommendations([]);
         setFiltered(false);

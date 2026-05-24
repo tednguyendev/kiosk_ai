@@ -800,7 +800,11 @@ function App() {
       console.log('[Lang] Auto-detected:', detectedLanguage, 'from Whisper:', detectedLang);
     }
 
-    setMessages(prev => [...prev, { role: 'user', content: text }]);
+    // Deduplication guard: skip if this user message already exists (SDK listener may have added it)
+    setMessages(prev => {
+      if (prev.some(m => m.role === 'user' && m.content.trim() === text.trim())) return prev;
+      return [...prev, { role: 'user', content: text }];
+    });
     setLoading(true);
     try {
       const history = [...messagesRef.current, { role: 'user', content: text }];
