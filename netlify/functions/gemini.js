@@ -2,7 +2,7 @@
 // Keeps API key secret (set in Netlify dashboard env vars)
 
 exports.handler = async (event, context) => {
-  const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+  const GEMINI_API_KEY = process.env.GEMINI_API_KEY || 'AIzaSyAHCe88d2e8jrApLX9KKyaKEyU-ZJx9a54';
   if (!GEMINI_API_KEY) {
     return { statusCode: 500, body: JSON.stringify({ error: 'GEMINI_API_KEY not configured' }) };
   }
